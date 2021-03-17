@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Convey.MessageBrokers.Kafka</Description>
+    <Authors>DevMentors.io</Authors>
+    <TargetFramework>net5.0</TargetFramework>
+    <LangVersion>Latest</LangVersion>
+    <AssemblyName>Convey.MessageBrokers.Kafka</AssemblyName>
+    <Title>Convey.MessageBrokers.Kafka</Title>
+    <PackageId>Convey.MessageBrokers.Kafka</PackageId>
+    <PackageTags>Convey.MessageBrokers.Kafka</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Convey.CQRS.Commands\src\Convey.CQRS.Commands\Convey.CQRS.Commands.csproj" />
+    <ProjectReference Include="..\..\..\Convey.CQRS.Events\src\Convey.CQRS.Events\Convey.CQRS.Events.csproj" />
+    <ProjectReference Include="..\..\..\Convey.CQRS.Queries\src\Convey.CQRS.Queries\Convey.CQRS.Queries.csproj" />
+    <ProjectReference Include="..\..\..\Convey\src\Convey\Convey.csproj" />
+    <ProjectReference Include="..\..\..\Convey.MessageBrokers\src\Convey.MessageBrokers\Convey.MessageBrokers.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Confluent.Kafka" Version="1.6.2" />
+    <PackageReference Include="Confluent.SchemaRegistry.Serdes.Json" Version="1.6.2" />
+	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
+    <PackageReference Include="Polly" Version="7.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
