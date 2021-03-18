@@ -85,7 +85,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             if (_loggerEnabled)
             {
                 _logger.LogInformation($"Publishing a message with Topic: '{publishTopic}' " +
-                                 $"[id: '{messageId}', correlation id: '{correlationId}']");
+                                 $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']");
             }
 
             return _kafkaDependentProducer.ProduceAsync(publishTopic, confluentMessage);

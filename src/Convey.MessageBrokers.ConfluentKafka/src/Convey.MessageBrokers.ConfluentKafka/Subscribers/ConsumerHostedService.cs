@@ -254,6 +254,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     
                     var messagePropertiesAccessor = scope.ServiceProvider.GetRequiredService<IMessagePropertiesAccessor>();
                     messagePropertiesAccessor.MessageProperties = messageProperties;
+                    //TODO: to be tested if this is scope based singleton or not 
 
 
                     //TODO: CorrelationContext is not implement as most probably it is used in plugins 
@@ -271,6 +272,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                             {
                                 Logger.LogError($"Commit error: {e.Error.Reason}");
                                 //TODO: Need to create a strategy to deal with commit failures 
+                                Task.Delay(-1, cancellationToken).Wait(cancellationToken);
                             }
                         }
                         else
@@ -278,6 +280,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                             Logger.LogError($"HandleAsync error : {exception.Message}");
                             //TODO: Need to create a strategy to deal with handler exceptions
                             //TODO: Restart service after bug fixes or restart Consumer service
+                            Task.Delay(-1, cancellationToken).Wait(cancellationToken);
                         }
 
                     }
@@ -316,6 +319,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
             var currentRetry = 0;
             var messageName = message.GetType().Name;
 
+            //TODO: Add Exponential back off
             var retryPolicy = Policy
                 .Handle<Exception>()
                 .WaitAndRetryAsync(_retries, i => TimeSpan.FromSeconds(_retryInterval));
