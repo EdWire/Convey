@@ -40,6 +40,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
 
         CancellationTokenSource CancellationTokenSource { get; }
 
+        private Thread ConsumerThread { get; set; }
         private bool DisposeCalled { get; set; }
 
 
@@ -55,7 +56,8 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
             ConsumerConfig = new ConsumerConfig
             {
                 // Disable auto-committing of offsets.
-                EnableAutoCommit = false
+                EnableAutoCommit = false,
+                AutoOffsetReset = AutoOffsetReset.Earliest
             };
             
             Configuration.GetSection("Kafka:ConsumerSettings").Bind(ConsumerConfig);
@@ -153,7 +155,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                 return;
             }
 
-            if (Events.ContainsKey(handler.Name))
+            if (EventHandlerForEvent.ContainsKey(@event))
             {
                 Logger.LogInformation($"EventConsumerHostedService:RegisterConsumerEventType called. HandlerType:{handler.Name} already exists. RegisterConsumerEventType Ignored.");
                 return;
@@ -166,13 +168,15 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
         {
             ServiceProvider = serviceProvider;
             _exceptionToMessageMapper = ServiceProvider.GetService<IExceptionToMessageMapper>() ?? new EmptyExceptionToMessageMapper();
-            //ConsumerThread = new Thread(() => StartConsumerLoop(CancellationToken));
             var cancellationToken = CancellationTokenSource.Token;
 
-            Task.Run(() =>
-            {
-                StartConsumerLoop(cancellationToken);
-            }, cancellationToken);
+            ConsumerThread = new Thread(() => StartConsumerLoop(cancellationToken));
+            ConsumerThread.Start();
+            
+            //Task.Run(() =>
+            //{
+            //    StartConsumerLoop(cancellationToken);
+            //}, cancellationToken);
         }
         private void StartConsumerLoop(CancellationToken cancellationToken)
         {
