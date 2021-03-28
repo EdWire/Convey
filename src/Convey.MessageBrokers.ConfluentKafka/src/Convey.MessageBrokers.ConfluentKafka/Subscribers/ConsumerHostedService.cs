@@ -56,6 +56,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
             ConsumerConfig = new ConsumerConfig
             {
                 // Disable auto-committing of offsets.
+                AllowAutoCreateTopics = kafkaOptions.ConsumerSettings.AllowAutoCreateTopics,
                 EnableAutoCommit = false,
                 AutoOffsetReset = AutoOffsetReset.Earliest
             };

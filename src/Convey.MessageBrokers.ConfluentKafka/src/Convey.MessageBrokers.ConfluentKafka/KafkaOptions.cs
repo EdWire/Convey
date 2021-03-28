@@ -11,6 +11,7 @@ namespace Convey.MessageBrokers.ConfluentKafka
     {
         public string BootstrapServers { get; set; }
         public string GroupId { get; set; }
+        public bool AllowAutoCreateTopics { get; set; }
     }
 
     public class Logger
