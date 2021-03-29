@@ -42,11 +42,16 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
 
         private Thread ConsumerThread { get; set; }
         private bool DisposeCalled { get; set; }
+        private bool StartCalled { get; set; }
+
+        private string EventConsumerHostedServiceId { get; set; }
 
 
-        public EventConsumerHostedService(IConfiguration configuration, KafkaOptions kafkaOptions,
-            ILogger<EventConsumerHostedService<TTopic>> logger, ITopic consumerTopic)
+        public EventConsumerHostedService(IConfiguration configuration, KafkaOptions kafkaOptions, ILogger<EventConsumerHostedService<TTopic>> logger, ITopic consumerTopic)
         {
+            EventConsumerHostedServiceId = Guid.NewGuid().ToString();
+            StartCalled = false;
+
             _kafkaOptions = kafkaOptions;
             Configuration = configuration;
             Logger = logger;
@@ -67,7 +72,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
             //this.topic = config.GetValue<List<string>>("Kafka:ServiceConsumerTopic").First();
             this.KafkaConsumer = new ConsumerBuilder<string, string>(ConsumerConfig).Build(); //TODO: Add error handler
 
-            Logger.LogInformation($"Consumer BackgroundService for Topic:{Topic.TopicName} GroupId:{ConsumerConfig.GroupId}");
+            Logger.LogInformation($"Consumer BackgroundService for Topic:{Topic.TopicName} GroupId:{ConsumerConfig.GroupId}. EventConsumerHostedServiceId:{EventConsumerHostedServiceId}");
             
             Events = new Dictionary<string,Type>();
             EventHandlerForEvent = new Dictionary<Type, Type>();
@@ -155,11 +160,20 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                 Logger.LogInformation($"EventConsumerHostedService:RegisterConsumerEventType called. EventType:{@event.Name} already exists. RegisterConsumerEventType Ignored.");
                 return;
             }
+            else
+            {
+                Logger.LogInformation($"EventConsumerHostedService:RegisterConsumerEventType called. EventType:{@event.Name} registered . EventConsumerHostedServiceId: { EventConsumerHostedServiceId}.");
+                
+            }
 
             if (EventHandlerForEvent.ContainsKey(@event))
             {
                 Logger.LogInformation($"EventConsumerHostedService:RegisterConsumerEventType called. HandlerType:{handler.Name} already exists. RegisterConsumerEventType Ignored.");
                 return;
+            }
+            else
+            {
+                Logger.LogInformation($"EventConsumerHostedService:RegisterConsumerEventType called. HandlerType:{handler.Name} registered . EventConsumerHostedServiceId: { EventConsumerHostedServiceId}.");
             }
 
             Events.Add(@event.Name, @event);
@@ -173,7 +187,9 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
 
             ConsumerThread = new Thread(() => StartConsumerLoop(cancellationToken));
             ConsumerThread.Start();
-            
+
+            //new Thread(() => StartConsumerLoop(stoppingToken)).Start();
+
             //Task.Run(() =>
             //{
             //    StartConsumerLoop(cancellationToken);
@@ -181,6 +197,10 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
         }
         private void StartConsumerLoop(CancellationToken cancellationToken)
         {
+            //Task.Delay(TimeSpan.FromSeconds(5)).Wait();
+            if (StartCalled) return; //NOTE: Patch for double starting 
+            if (!StartCalled) StartCalled = true;
+
             KafkaConsumer.Subscribe(Topic.TopicName);
 
             while (!cancellationToken.IsCancellationRequested)
@@ -231,18 +251,18 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     var eventHandlerType = EventHandlerForEvent[registeredEventType];
                     if (_loggerEnabled)
                     {
-                        Logger.LogInformation($"Consumer info, the incoming event type is:{cr.Message.Key}, the registered event type : {registeredEventType.Name} and the registered EventHandler type:{eventHandlerType}");
+                        Logger.LogInformation($"Consumer info, the incoming event type is:{cr.Message.Key}, the registered event type : {registeredEventType.Name} and the registered EventHandler type:{eventHandlerType}. TimeStamp:{DateTimeOffset.UtcNow}");
                     }
 
                     if (_loggerEnabled)
                     {
-                        Logger.LogInformation($"Consumer info, the incoming event is about to be deserialized using registered event type");
+                        Logger.LogInformation($"Consumer info, the incoming event is about to be deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
                     }
                         
                     var deserializeEvent = JsonConvert.DeserializeObject(cr.Message.Value, registeredEventType);
                     if (_loggerEnabled)
                     {
-                        Logger.LogInformation($"Consumer info, the incoming event is successfully deserialized using registered event type");
+                        Logger.LogInformation($"Consumer info, the incoming event is successfully deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
                     }
 
                     using var scope = ServiceProvider.CreateScope();
@@ -359,11 +379,11 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                 {
                     var retryMessage = currentRetry == 0 ? string.Empty : $"Retry: {currentRetry}'.";
 
-                    var preLogMessage = $"Handling a message: '{messageName}'. {retryMessage}";
+                    var preLogMessage = $"Handling a message: '{messageName}'. {retryMessage}. TimeStamp:{DateTimeOffset.UtcNow}";
 
                     Logger.LogInformation(preLogMessage);
 
-                    Logger.LogInformation($"Consumer info, the bus subscriber registered handle is about to be called");
+                    Logger.LogInformation($"Consumer info, the bus subscriber registered handle is about to be called for '{messageName}'. TimeStamp:{DateTimeOffset.UtcNow}");
                     object[] parameters = new object[] { message };
                     var handleAsyncTask = (Task)messageHandlerMethodInfo.Invoke(messageHandler, parameters);
 
@@ -376,9 +396,9 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     }
 
                     handleAsyncTask.Wait();
-                    Logger.LogInformation($"Consumer info, the bus subscriber registered handle is successfully called");
+                    Logger.LogInformation($"Consumer info, the bus subscriber registered handle is successfully called for '{messageName}'. TimeStamp:{DateTimeOffset.UtcNow}");
 
-                    var postLogMessage = $"Handled a message: '{messageName}'. {retryMessage}";
+                    var postLogMessage = $"Handled a message: '{messageName}'. {retryMessage}. TimeStamp:{DateTimeOffset.UtcNow}";
                     Logger.LogInformation(postLogMessage);
 
                     return null;
