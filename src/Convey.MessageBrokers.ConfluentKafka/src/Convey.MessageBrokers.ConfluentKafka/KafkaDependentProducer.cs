@@ -38,8 +38,10 @@ namespace Convey.MessageBrokers.ConfluentKafka
         ///     via the returned Task. Use this method of producing if you would
         ///     like to await the result before flow of execution continues.
         /// <summary>
-        public Task ProduceAsync(string topic, Message<K, V> message)
-            => this.kafkaHandle.ProduceAsync(topic, message);
+        public Task<DeliveryResult<K, V>> ProduceAsync(string topic, Message<K, V> message)
+        {
+            return this.kafkaHandle.ProduceAsync(topic, message);
+        }
 
         /// <summary>
         ///     Asynchronously produce a message and expose delivery information

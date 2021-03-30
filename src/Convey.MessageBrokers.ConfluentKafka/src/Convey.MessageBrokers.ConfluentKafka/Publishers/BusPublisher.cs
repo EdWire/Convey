@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Confluent.Kafka;
+using Convey.MessageBrokers.ConfluentKafka.Exceptions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -37,7 +38,15 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
         {
             var publishTopic = _kafkaOptions.ServicePublishTopic;
             
-            var messageKey = message.GetType().Name;
+            var confluentMessageId = string.IsNullOrWhiteSpace(messageId)
+                ? Guid.NewGuid().ToString("N")
+                : messageId;
+
+            var confluentCorrelationId = string.IsNullOrWhiteSpace(correlationId)
+                ? Guid.NewGuid().ToString("N")
+                : correlationId;
+
+            var messageKey = confluentMessageId;
             var messageValue = JsonConvert.SerializeObject(message);
 
             var confluentMessage = new Message<string, string>
@@ -48,18 +57,12 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                 Headers = new Headers()
             };
 
-            var messageTypeBody = Encoding.UTF8.GetBytes(messageKey);
+            var messageTypeBody = Encoding.UTF8.GetBytes(message.GetType().Name);
             confluentMessage.Headers.Add(_messageTypeHeader, messageTypeBody);
 
-            var confluentMessageId = string.IsNullOrWhiteSpace(messageId)
-                ? Guid.NewGuid().ToString("N")
-                : messageId;
             var messageIdBody = Encoding.UTF8.GetBytes(confluentMessageId);
             confluentMessage.Headers.Add(_messageIdHeader, messageIdBody);
-
-            var confluentCorrelationId = string.IsNullOrWhiteSpace(correlationId)
-                ? Guid.NewGuid().ToString("N")
-                : correlationId;
+            
             var correlationIdBody = Encoding.UTF8.GetBytes(confluentCorrelationId);
             confluentMessage.Headers.Add(_correlationIdHeader, correlationIdBody);
 
@@ -84,11 +87,30 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
 
             if (_loggerEnabled)
             {
-                _logger.LogInformation($"Publishing a message with Topic: '{publishTopic}' " +
-                                 $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']");
+                _logger.LogInformation($"Trying to publishing a message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']");
             }
 
-            return _kafkaDependentProducer.ProduceAsync(publishTopic, confluentMessage);
+            
+            //throw new KafkaPersistenceException(confluentMessageId);
+
+            var produceAsync = _kafkaDependentProducer.ProduceAsync(publishTopic, confluentMessage);
+            produceAsync.Wait();
+            var produceAsyncResult = produceAsync.Result;
+
+            if (produceAsyncResult.Status == PersistenceStatus.NotPersisted)
+            {
+                _logger.LogError($"Throwing KafkaPersistenceException for message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']");
+                //TODO:
+                throw new KafkaPersistenceException(confluentMessageId);
+            }
+
+            if (_loggerEnabled)
+            {
+                _logger.LogInformation($"Published message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}'] with persistence status:{produceAsyncResult.Status}");
+            }
+            
+            return Task.CompletedTask;
+            
         }
     }
 }
