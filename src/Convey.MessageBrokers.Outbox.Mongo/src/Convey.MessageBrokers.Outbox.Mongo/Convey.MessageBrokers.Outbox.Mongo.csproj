@@ -12,9 +12,13 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
-  <ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Convey.Persistence.MongoDB" Version="0.5.433" />
+		<PackageReference Include="Convey.MessageBrokers.Outbox" Version="0.5.5000" />
+	</ItemGroup>
+  <!--<ItemGroup>
     <ProjectReference Include="..\..\..\Convey.MessageBrokers.Outbox\src\Convey.MessageBrokers.Outbox\Convey.MessageBrokers.Outbox.csproj" />
     <ProjectReference Include="..\..\..\Convey.Persistence.MongoDB\src\Convey.Persistence.MongoDB\Convey.Persistence.MongoDB.csproj" />
-  </ItemGroup>
+  </ItemGroup>-->
 
 </Project>
