@@ -18,7 +18,7 @@ namespace Convey.MessageBrokers.Outbox.Processors
         private readonly TimeSpan _interval;
         private readonly OutboxType _type;
         private Timer _timer;
-
+        static readonly SemaphoreSlim SemaphoreSlim = new SemaphoreSlim(1, 1);
         public OutboxProcessor(IServiceScopeFactory serviceScopeFactory, IBusPublisher publisher, OutboxOptions options,
             ILogger<OutboxProcessor> logger)
         {
@@ -72,6 +72,7 @@ namespace Convey.MessageBrokers.Outbox.Processors
             }
 
             _timer?.Change(Timeout.Infinite, 0);
+            _timer?.Dispose();
             return Task.CompletedTask;
         }
 
@@ -82,37 +83,65 @@ namespace Convey.MessageBrokers.Outbox.Processors
 
         private async Task SendOutboxMessagesAsync()
         {
-            var jobId = Guid.NewGuid().ToString("N");
-            _logger.LogTrace($"Started processing outbox messages... [job id: '{jobId}']");
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
-            using var scope = _serviceScopeFactory.CreateScope();
-            var outbox = scope.ServiceProvider.GetRequiredService<IMessageOutboxAccessor>();
-            var messages = await outbox.GetUnsentAsync();
-            _logger.LogTrace($"Found {messages.Count} unsent messages in outbox [job id: '{jobId}'].");
-            if (!messages.Any())
-            {
-                _logger.LogTrace($"No messages to be processed in outbox [job id: '{jobId}'].");
-                return;
-            }
+            string jobId = Guid.NewGuid().ToString("N");
 
-            foreach (var message in messages.OrderBy(m => m.SentAt))
+            try
             {
-                await _publisher.PublishAsync(message.Message, message.Id, message.CorrelationId,
-                    message.SpanContext, message.MessageContext, message.Headers);
-                if (_type == OutboxType.Sequential)
+                _logger.LogTrace($"Trying to obtain lock for outbox messages... [job id: '{jobId}']");
+                await SemaphoreSlim.WaitAsync();
+
+                _logger.LogTrace($"Obtained lock for outbox messages... [job id: '{jobId}']");
+
+                _logger.LogTrace($"Stopping timer for outbox messages... [job id: '{jobId}']");
+                var stopTimer= _timer.Change(Timeout.Infinite, Timeout.Infinite);
+                
+                _logger.LogTrace($"Started processing outbox messages... [job id: '{jobId}']");
+                var stopwatch = new Stopwatch();
+                stopwatch.Start();
+                using var scope = _serviceScopeFactory.CreateScope();
+                var outbox = scope.ServiceProvider.GetRequiredService<IMessageOutboxAccessor>();
+                var messages = await outbox.GetUnsentAsync();
+                _logger.LogTrace($"Found {messages.Count} unsent messages in outbox [job id: '{jobId}'].");
+                if (!messages.Any())
                 {
-                    await outbox.ProcessAsync(message);
+                    _logger.LogTrace($"No messages to be processed in outbox [job id: '{jobId}'].");
+                    return;
                 }
-            }
 
-            if (_type == OutboxType.Parallel)
-            {
-                await outbox.ProcessAsync(messages);
+                foreach (var message in messages.OrderBy(m => m.SentAt))
+                {
+                    await _publisher.PublishAsync(message.Message, message.Id, message.CorrelationId,
+                        message.SpanContext, message.MessageContext, message.Headers);
+                    if (_type == OutboxType.Sequential)
+                    {
+                        await outbox.ProcessAsync(message);
+                    }
+                }
+
+                if (_type == OutboxType.Parallel)
+                {
+                    await outbox.ProcessAsync(messages);
+                }
+
+                stopwatch.Stop();
+                _logger.LogTrace($"Processed {messages.Count} outbox messages in {stopwatch.ElapsedMilliseconds} ms [job id: '{jobId}'].");
             }
-            
-            stopwatch.Stop();
-            _logger.LogTrace($"Processed {messages.Count} outbox messages in {stopwatch.ElapsedMilliseconds} ms [job id: '{jobId}'].");
+            finally
+            {
+                _logger.LogTrace($"Trying to release lock and reset timer for outbox messages... [job id: '{jobId}', interval: {_interval}]");
+
+                try
+                {
+                    SemaphoreSlim.Release();
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e.ToString());
+                    //throw;
+                }
+
+                _timer.Change(TimeSpan.Zero, _interval);
+            }
         }
 
         private enum OutboxType
