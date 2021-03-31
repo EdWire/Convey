@@ -15,6 +15,7 @@
 // Refer to LICENSE for more information.
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
 
@@ -34,13 +35,23 @@ namespace Convey.MessageBrokers.ConfluentKafka
         }
 
         /// <summary>
-        ///     Asychronously produce a message and expose delivery information
+        ///     Asynchronously produce a message and expose delivery information
         ///     via the returned Task. Use this method of producing if you would
         ///     like to await the result before flow of execution continues.
         /// <summary>
         public Task<DeliveryResult<K, V>> ProduceAsync(string topic, Message<K, V> message)
         {
             return this.kafkaHandle.ProduceAsync(topic, message);
+        }
+
+        /// <summary>
+        ///     Asynchronously produce a message and expose delivery information
+        ///     via the returned Task. Use this method of producing if you would
+        ///     like to await the result before flow of execution continues.
+        /// <summary>
+        public Task<DeliveryResult<K, V>> ProduceAsync(string topic, Message<K, V> message, CancellationToken cancellationToken )
+        {
+            return this.kafkaHandle.ProduceAsync(topic, message , cancellationToken);
         }
 
         /// <summary>

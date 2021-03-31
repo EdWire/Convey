@@ -30,6 +30,7 @@ namespace Convey.MessageBrokers.ConfluentKafka
         public ProducerSettings ProducerSettings { get; set; }
         public ConsumerSettings ConsumerSettings { get; set; }
         public string ServicePublishTopic { get; set; }
+        public int PublishTimeoutInMilliseconds { get; set; }
         public int Retries { get; set; }
         public int RetryInterval { get; set; }
         public Logger Logger { get; set; }

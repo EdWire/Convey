@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
 using Convey.MessageBrokers.ConfluentKafka.Exceptions;
@@ -19,11 +20,14 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
         private readonly string _correlationIdHeader;
         private readonly string _spanContextHeader;
         private readonly bool _loggerEnabled;
+        private readonly int _publishTimeoutInMilliseconds;
 
         public BusPublisher(KafkaOptions kafkaOptions, KafkaDependentProducer<string, string> kafkaDependentProducer, ILogger<BusPublisher> logger)
         {
             _kafkaOptions = kafkaOptions;
             _kafkaDependentProducer = kafkaDependentProducer;
+            _publishTimeoutInMilliseconds = kafkaOptions.PublishTimeoutInMilliseconds;
+
             _loggerEnabled = _kafkaOptions.Logger?.Enabled ?? false;
             _messageTypeHeader = _kafkaOptions.GetMessageTypeHeader();
             _messageIdHeader = _kafkaOptions.GetMessageIdHeader();
@@ -90,17 +94,47 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                 _logger.LogInformation($"Trying to publishing a message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']");
             }
 
-            
-            //throw new KafkaPersistenceException(confluentMessageId);
 
-            var produceAsync = _kafkaDependentProducer.ProduceAsync(publishTopic, confluentMessage);
-            produceAsync.Wait();
+            //throw new KafkaPersistenceException(confluentMessageId);
+            CancellationTokenSource tokenSource = null;
+            Task<DeliveryResult<string, string>> produceAsync = null;
+
+            try
+            {
+                tokenSource = new CancellationTokenSource();
+                tokenSource.CancelAfter(_publishTimeoutInMilliseconds);
+                produceAsync = _kafkaDependentProducer.ProduceAsync(publishTopic, confluentMessage, tokenSource.Token);
+                produceAsync.Wait(tokenSource.Token);
+            }
+            catch (OperationCanceledException e)
+            {
+                _logger.LogError($"_kafkaDependentProducer.ProduceAsync throwing OperationCanceledException for message for exceeding TimeSpan in Milliseconds :{_publishTimeoutInMilliseconds} with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']. Exception:{e}");
+
+                throw;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError($"_kafkaDependentProducer.ProduceAsync throwing Exception for message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']. Exception:{e}");
+                throw;
+            }
+            finally
+            {
+                tokenSource.Dispose();
+            }
+
+            if (produceAsync is null)
+            {
+                _logger.LogError($"Throwing KafkaPersistenceException due to non ability to call _kafkaDependentProducer.ProduceAsync method for message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']");
+                //TODO: Add ability to notify the admin about failure to send event
+                throw new KafkaPersistenceException(confluentMessageId);
+            }
+            
             var produceAsyncResult = produceAsync.Result;
 
             if (produceAsyncResult.Status == PersistenceStatus.NotPersisted)
             {
                 _logger.LogError($"Throwing KafkaPersistenceException for message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}']");
-                //TODO:
+                //TODO: Add ability to notify the admin about failure to send event
                 throw new KafkaPersistenceException(confluentMessageId);
             }
 
@@ -108,6 +142,9 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             {
                 _logger.LogInformation($"Published message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}'] with persistence status:{produceAsyncResult.Status}");
             }
+
+            //_logger.LogInformation($"Delay after publishing message with Topic: '{publishTopic}' " + $"[id: '{confluentMessageId}', correlation id: '{confluentCorrelationId}'] with persistence status:{produceAsyncResult.Status}");
+            //Task.Delay(TimeSpan.FromMinutes(3)).Wait();
             
             return Task.CompletedTask;
             

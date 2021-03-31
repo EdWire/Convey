@@ -15,6 +15,7 @@
 // Refer to LICENSE for more information.
 
 using System;
+using System.Threading;
 using Confluent.Kafka;
 using Microsoft.Extensions.Configuration;
 
@@ -36,12 +37,14 @@ namespace Convey.MessageBrokers.ConfluentKafka
     public class KafkaClientHandle : IDisposable
     {
         IProducer<byte[], byte[]> kafkaProducer;
-
+        private readonly int _publishTimeoutInMilliseconds;
         public KafkaClientHandle(IConfiguration config)
         {
             var conf = new ProducerConfig();
             config.GetSection("Kafka:ProducerSettings").Bind(conf);
             this.kafkaProducer = new ProducerBuilder<byte[], byte[]>(conf).Build();
+
+            _publishTimeoutInMilliseconds = config.GetValue<int>("Kafka:PublishTimeoutInMilliseconds");
         }
 
         public Handle Handle { get => this.kafkaProducer.Handle; }
@@ -50,7 +53,21 @@ namespace Convey.MessageBrokers.ConfluentKafka
         {
             // Block until all outstanding produce requests have completed (with or
             // without error).
-            kafkaProducer.Flush();
+            CancellationTokenSource tokenSource = null;
+            try
+            {
+                tokenSource = new CancellationTokenSource();
+                tokenSource.CancelAfter(_publishTimeoutInMilliseconds);
+                kafkaProducer.Flush(tokenSource.Token);
+            }
+            catch
+            {
+                //
+            }
+            finally
+            {
+                tokenSource?.Dispose();
+            }
             kafkaProducer.Dispose();
         }
     }
