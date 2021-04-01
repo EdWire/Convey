@@ -39,6 +39,10 @@ namespace Convey.MessageBrokers.ConfluentKafka
         public string MessageIdHeader { get; set; }
         public string CorrelationIdHeader { get; set; }
         public string SpanContextHeader { get; set; }
+        public string AggregateIdHeader { get; set; }
+
+        public string GetAggregateIdHeader()
+            => string.IsNullOrWhiteSpace(AggregateIdHeader) ? "aggregateId" : AggregateIdHeader;
 
         public string GetMessageTypeHeader()
             => string.IsNullOrWhiteSpace(MessageTypeHeader) ? "messageType" : MessageTypeHeader;

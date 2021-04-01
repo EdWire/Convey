@@ -19,6 +19,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
         private readonly string _messageIdHeader;
         private readonly string _correlationIdHeader;
         private readonly string _spanContextHeader;
+        private readonly string _aggregateIdHeader;
         private readonly bool _loggerEnabled;
         private readonly int _publishTimeoutInMilliseconds;
 
@@ -33,6 +34,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             _messageIdHeader = _kafkaOptions.GetMessageIdHeader();
             _correlationIdHeader = _kafkaOptions.GetCorrelationIdHeader();
             _spanContextHeader = _kafkaOptions.GetSpanContextHeader();
+            _aggregateIdHeader = _kafkaOptions.GetAggregateIdHeader();
             _logger = logger;
         }
 
@@ -41,7 +43,23 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             where T : class
         {
             var publishTopic = _kafkaOptions.ServicePublishTopic;
-            
+
+            var aggregateId = string.Empty;
+
+            if (headers is { })
+            {
+                if (headers.Keys.Contains(_aggregateIdHeader))
+                {
+                    var aggregateIdObject = headers[_aggregateIdHeader];
+                    aggregateId = aggregateIdObject as string;
+                }
+            }
+
+            if (_loggerEnabled)
+            {
+                _logger.LogInformation($"After trying to get aggregateId for a message the value is: {aggregateId}");
+            }
+
             var confluentMessageId = string.IsNullOrWhiteSpace(messageId)
                 ? Guid.NewGuid().ToString("N")
                 : messageId;
@@ -50,7 +68,10 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                 ? Guid.NewGuid().ToString("N")
                 : correlationId;
 
-            var messageKey = confluentMessageId;
+            var messageKey = string.IsNullOrWhiteSpace(aggregateId) 
+                ? confluentMessageId 
+                : aggregateId;
+
             var messageValue = JsonConvert.SerializeObject(message);
 
             var confluentMessage = new Message<string, string>

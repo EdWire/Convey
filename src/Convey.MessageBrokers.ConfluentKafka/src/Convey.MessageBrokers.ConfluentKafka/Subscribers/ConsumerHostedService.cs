@@ -214,7 +214,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
 
                     if (_loggerEnabled)
                     {
-                        Logger.LogTrace($"Received a message with id: '{messageProperties.MessageId}', " +
+                        Logger.LogInformation($"Received a message with key: '{cr.Message.Key}', id: '{messageProperties.MessageId}', " +
                                                $"correlation id: '{messageProperties.CorrelationId}', unix timestamp: {messageProperties.Timestamp} " +
                                                $"from Kafka Topic: {Topic.TopicName}.");
                     }
