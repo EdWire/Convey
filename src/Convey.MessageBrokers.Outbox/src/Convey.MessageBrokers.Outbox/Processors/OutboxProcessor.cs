@@ -18,7 +18,7 @@ namespace Convey.MessageBrokers.Outbox.Processors
         private readonly TimeSpan _interval;
         private readonly OutboxType _type;
         private Timer _timer;
-        static readonly SemaphoreSlim SemaphoreSlim = new SemaphoreSlim(1, 1);
+        static readonly SemaphoreSlim SemaphoreSlim = new(1, 1);
         public OutboxProcessor(IServiceScopeFactory serviceScopeFactory, IBusPublisher publisher, OutboxOptions options,
             ILogger<OutboxProcessor> logger)
         {
@@ -60,7 +60,7 @@ namespace Convey.MessageBrokers.Outbox.Processors
                 return Task.CompletedTask;
             }
 
-            _timer = new Timer(SendOutboxMessages, null, TimeSpan.Zero, _interval);
+            _timer = new Timer(SendOutboxMessages, null, _interval, _interval);
             return Task.CompletedTask;
         }
 
@@ -85,6 +85,7 @@ namespace Convey.MessageBrokers.Outbox.Processors
         {
             string jobId = Guid.NewGuid().ToString("N");
 
+            _logger.LogTrace($"SendOutboxMessagesAsync start time for outbox messages... [job id: '{jobId}', interval: {_interval}], start time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
             try
             {
                 _logger.LogTrace($"Trying to obtain lock for outbox messages... [job id: '{jobId}']");
@@ -93,14 +94,18 @@ namespace Convey.MessageBrokers.Outbox.Processors
                 _logger.LogTrace($"Obtained lock for outbox messages... [job id: '{jobId}']");
 
                 _logger.LogTrace($"Stopping timer for outbox messages... [job id: '{jobId}']");
-                var stopTimer= _timer.Change(Timeout.Infinite, Timeout.Infinite);
+                _timer?.Change(Timeout.Infinite, Timeout.Infinite);
                 
                 _logger.LogTrace($"Started processing outbox messages... [job id: '{jobId}']");
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
                 using var scope = _serviceScopeFactory.CreateScope();
                 var outbox = scope.ServiceProvider.GetRequiredService<IMessageOutboxAccessor>();
+
+                _logger.LogTrace($"Start time for unsent messages of outbox messages... [job id: '{jobId}', interval: {_interval}], start time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
                 var messages = await outbox.GetUnsentAsync();
+                _logger.LogTrace($"End time for unsent messages of outbox messages... [job id: '{jobId}', interval: {_interval}], end time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
+
                 _logger.LogTrace($"Found {messages.Count} unsent messages in outbox [job id: '{jobId}'].");
                 if (!messages.Any())
                 {
@@ -140,7 +145,12 @@ namespace Convey.MessageBrokers.Outbox.Processors
                     //throw;
                 }
 
-                _timer.Change(TimeSpan.Zero, _interval);
+                _logger.LogTrace($"Released lock and reset timer for outbox messages... [job id: '{jobId}', interval: {_interval}]");
+                
+                _logger.LogTrace($"Starting timer for outbox messages... [job id: '{jobId}', dueTime:{_interval}, period:{_interval}]");
+                _timer?.Change(_interval, _interval);
+
+                _logger.LogTrace($"SendOutboxMessagesAsync end time for outbox messages... [job id: '{jobId}', interval: {_interval}], end time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
             }
         }
 
