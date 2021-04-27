@@ -23,7 +23,9 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
         private readonly string _messageIdHeader;
         private readonly string _correlationIdHeader;
         private readonly string _spanContextHeader;
+        private readonly string _correlationContextHeader;
         private readonly bool _loggerEnabled;
+        private readonly bool _contextEnabled;
         private readonly int _retries;
         private readonly int _retryInterval;
         private IExceptionToMessageMapper _exceptionToMessageMapper;
@@ -84,7 +86,9 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
             _messageIdHeader = _kafkaOptions.GetMessageIdHeader();
             _correlationIdHeader = _kafkaOptions.GetCorrelationIdHeader();
             _spanContextHeader = _kafkaOptions.GetSpanContextHeader();
+            _correlationContextHeader = _kafkaOptions.GetCorrelationContextHeader();
             _loggerEnabled = _kafkaOptions.Logger?.Enabled ?? false;
+            _contextEnabled = _kafkaOptions.Context?.Enabled == true;
             _retries = _kafkaOptions.Retries >= 0 ? _kafkaOptions.Retries : 3;
             _retryInterval = _kafkaOptions.RetryInterval > 0 ? _kafkaOptions.RetryInterval : 2;
         }
@@ -92,7 +96,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
         #region override
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            Logger.LogInformation($"EventConsumerHostedService is running.{Environment.NewLine}");
+            Logger.LogInformation($"EventConsumerHostedService is running. EventConsumerHostedServiceId:{EventConsumerHostedServiceId}");
 
             return Task.CompletedTask;
         }
@@ -280,6 +284,18 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     var messagePropertiesAccessor = scope.ServiceProvider.GetRequiredService<IMessagePropertiesAccessor>();
                     messagePropertiesAccessor.MessageProperties = messageProperties;
 
+
+                    if (_contextEnabled)
+                    {
+                        var correlationContext  = GetMessageCorrelationContext(cr.Message);
+
+                        if (correlationContext is not null)
+                        {
+                            var correlationContextAccessor = scope.ServiceProvider.GetRequiredService<ICorrelationContextAccessor>();
+                            correlationContextAccessor.CorrelationContext = correlationContext;
+                        }
+                    }
+
                     object eventHandlerObject;
                     try
                     {
@@ -312,9 +328,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                         Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
                         break;
                     }
-
-                    //TODO: CorrelationContext is not implement as most probably it is used in plugins 
-
+                    
                     try
                     {
                         var messageName = deserializeEvent.GetType().Name;
@@ -379,6 +393,22 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     break;
                 }
             }
+        }
+
+        private object GetMessageCorrelationContext(Message<string, string> message)
+        {
+            object correlationContext = null; //NOTE: This value is NOT optional
+            var messageHeaders = message.Headers;
+            foreach (var messageHeader in messageHeaders)
+            {
+                if (messageHeader.Key == _correlationContextHeader)
+                {
+                    var correlationContextJson = Encoding.UTF8.GetString(messageHeader.GetValueBytes());
+                    correlationContext = JsonConvert.DeserializeObject(correlationContextJson); //TODO: check if it works
+                }
+            }
+
+            return correlationContext;
         }
 
         private Exception TryHandleAsync(object message, object messageHandler, MethodInfo messageHandlerMethodInfo, string messageId, string correlationId)

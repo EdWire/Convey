@@ -20,6 +20,8 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
         private readonly string _correlationIdHeader;
         private readonly string _spanContextHeader;
         private readonly string _aggregateIdHeader;
+        private readonly string _correlationContextHeader;
+        private readonly bool _contextEnabled;
         private readonly bool _loggerEnabled;
         private readonly int _publishTimeoutInMilliseconds;
 
@@ -29,12 +31,15 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             _kafkaDependentProducer = kafkaDependentProducer;
             _publishTimeoutInMilliseconds = kafkaOptions.PublishTimeoutInMilliseconds;
 
+            _contextEnabled = _kafkaOptions.Context?.Enabled == true;
             _loggerEnabled = _kafkaOptions.Logger?.Enabled ?? false;
             _messageTypeHeader = _kafkaOptions.GetMessageTypeHeader();
             _messageIdHeader = _kafkaOptions.GetMessageIdHeader();
             _correlationIdHeader = _kafkaOptions.GetCorrelationIdHeader();
             _spanContextHeader = _kafkaOptions.GetSpanContextHeader();
             _aggregateIdHeader = _kafkaOptions.GetAggregateIdHeader();
+            _correlationContextHeader = _kafkaOptions.GetCorrelationContextHeader();
+
             _logger = logger;
         }
 
@@ -91,13 +96,18 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             var correlationIdBody = Encoding.UTF8.GetBytes(confluentCorrelationId);
             confluentMessage.Headers.Add(_correlationIdHeader, correlationIdBody);
 
+            if (_contextEnabled)
+            {
+                IncludeMessageContext(messageContext, confluentMessage);
+            }
+            
             if (!string.IsNullOrWhiteSpace(spanContext))
             {
                 var spanContextBody = Encoding.UTF8.GetBytes(spanContext);
                 confluentMessage.Headers.Add(_spanContextHeader, spanContextBody);
             }
 
-            if (headers is { })
+            if (headers is {})
             {
                 foreach (var (key, value) in headers)
                 {
@@ -169,6 +179,15 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             
             return Task.CompletedTask;
             
+        }
+
+        private void IncludeMessageContext(object context, Message<string, string> properties)
+        {
+            if (context is null) return;
+
+            var serializedContext = JsonConvert.SerializeObject(context);
+            var contextBody = Encoding.UTF8.GetBytes(serializedContext);
+            properties.Headers.Add(_correlationContextHeader, contextBody);
         }
     }
 }
