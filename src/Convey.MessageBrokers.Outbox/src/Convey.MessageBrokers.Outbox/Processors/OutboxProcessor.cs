@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -6,6 +7,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 
 namespace Convey.MessageBrokers.Outbox.Processors
 {
@@ -19,6 +22,9 @@ namespace Convey.MessageBrokers.Outbox.Processors
         private readonly OutboxType _type;
         private Timer _timer;
         static readonly SemaphoreSlim SemaphoreSlim = new(1, 1);
+
+        private readonly TextMapPropagator _propagator;
+
         public OutboxProcessor(IServiceScopeFactory serviceScopeFactory, IBusPublisher publisher, OutboxOptions options,
             ILogger<OutboxProcessor> logger)
         {
@@ -44,6 +50,7 @@ namespace Convey.MessageBrokers.Outbox.Processors
             _logger = logger;
             _type = OutboxType.Sequential;
             _interval = TimeSpan.FromMilliseconds(options.IntervalMilliseconds);
+            _propagator = Propagators.DefaultTextMapPropagator;
             if (options.Enabled)
             {
                 _logger.LogInformation($"Outbox is enabled, type: '{_type}', message processing every {options.IntervalMilliseconds} ms.");
@@ -115,11 +122,42 @@ namespace Convey.MessageBrokers.Outbox.Processors
 
                 foreach (var message in messages.OrderBy(m => m.SentAt))
                 {
-                    await _publisher.PublishAsync(message.Message, message.Id, message.CorrelationId,
-                        message.SpanContext, message.MessageContext, message.Headers);
-                    if (_type == OutboxType.Sequential)
+                    message.Headers ??= new Dictionary<string, object>();
+
+                    var destinationName = "Unknown";
+                    var eventName = message.GetType().Name;
+
+                    if (message.Headers.ContainsKey(Extensions.Destination) && message.Headers[Extensions.Destination] is string)
                     {
-                        await outbox.ProcessAsync(message);
+                        destinationName = message.Headers[Extensions.Destination] as string;
+                        message.Headers.Remove(Extensions.Destination);
+                    }
+
+                    if (message.Headers.ContainsKey(Extensions.EventName) && message.Headers[Extensions.EventName] is string)
+                    {
+                        eventName = message.Headers[Extensions.EventName] as string;
+                        message.Headers.Remove(Extensions.EventName);
+                    }
+
+                    var parentContext = _propagator.Extract(default, message.Headers, ExtractTraceContextFromOutboxMessageHeaders);
+                    Baggage.Current = parentContext.Baggage;
+
+                    var activityName = $"{destinationName} receive";
+
+                    //NOTE: make sure that a parent activity is available (parentContext.ActivityContext.TraceId == new ActivityTraceId()) 
+                    using (var activity = parentContext.ActivityContext.TraceId== new ActivityTraceId() ? null: Extensions.MessageOutboxActivitySource.StartActivity(activityName, ActivityKind.Consumer, parentContext.ActivityContext))
+                    {
+                        //Add Tags to the Activity
+                        activity?.SetTag("messaging.system", "outbox");
+                        activity?.SetTag("messaging.destination", destinationName);
+                        activity?.SetTag("messaging.event", eventName);
+
+                        await _publisher.PublishAsync(message.Message, message.Id, message.CorrelationId, message.SpanContext, message.MessageContext, message.Headers);
+                        
+                        if (_type == OutboxType.Sequential)
+                        {
+                            await outbox.ProcessAsync(message);
+                        }
                     }
                 }
 
@@ -158,6 +196,29 @@ namespace Convey.MessageBrokers.Outbox.Processors
         {
             Sequential,
             Parallel
+        }
+
+        private IEnumerable<string> ExtractTraceContextFromOutboxMessageHeaders(IDictionary<string, object> headers, string key)
+        {
+            try
+            {
+                if (headers.TryGetValue(key, out var value))
+                {
+                    if (value is string valueStr)
+                    {
+                        return new[] { valueStr };
+                    }
+
+                    throw new FormatException($"Type:{value.GetType()} of value:{value} not found to be of Type:{nameof(String)}.");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to extract trace context: {ex}");
+            }
+
+            return Enumerable.Empty<string>();
         }
     }
 }

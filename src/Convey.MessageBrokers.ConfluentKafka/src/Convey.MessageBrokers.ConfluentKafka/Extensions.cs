@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Reflection;
 using Convey.CQRS.Events;
 using Convey.CQRS.Commands;
 using Convey.MessageBrokers.ConfluentKafka.Publishers;
@@ -103,5 +105,7 @@ namespace Convey.MessageBrokers.ConfluentKafka
 
             return app;
         }
+
+        public static readonly ActivitySource ConfluentKafkaActivitySource = new(Assembly.GetAssembly(typeof(Convey.MessageBrokers.ConfluentKafka.Extensions)).GetName().Name);
     }
 }

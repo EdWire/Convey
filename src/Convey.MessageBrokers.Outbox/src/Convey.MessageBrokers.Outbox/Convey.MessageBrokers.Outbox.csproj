@@ -21,6 +21,8 @@
 	  <PackageReference Include="Convey" Version="0.5.433" />
 	  <PackageReference Include="Convey.MessageBrokers" Version="0.5.433" />
 	  <PackageReference Include="Microsoft.Extensions.Hosting" Version="5.0.0" />
+	  <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.6573.7" />
+	  <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.6573.7" />
   </ItemGroup>
   
 </Project>

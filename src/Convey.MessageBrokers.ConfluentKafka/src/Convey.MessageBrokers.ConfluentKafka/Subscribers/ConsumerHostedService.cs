@@ -1,17 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
-using Convey.CQRS.Events;
 using Convey.MessageBrokers.ConfluentKafka.Topics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using Polly;
 
 namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
@@ -48,7 +51,8 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
 
         private string EventConsumerHostedServiceId { get; set; }
 
-
+        private readonly TextMapPropagator _propagator;
+        private readonly string _defaultConsumerServiceName;
         public EventConsumerHostedService(IConfiguration configuration, KafkaOptions kafkaOptions, ILogger<EventConsumerHostedService<TTopic>> logger, ITopic consumerTopic)
         {
             EventConsumerHostedServiceId = Guid.NewGuid().ToString();
@@ -63,12 +67,14 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
             ConsumerConfig = new ConsumerConfig
             {
                 // Disable auto-committing of offsets.
-                AllowAutoCreateTopics = kafkaOptions.ConsumerSettings.AllowAutoCreateTopics,
+                //AllowAutoCreateTopics = kafkaOptions.ConsumerSettings.AllowAutoCreateTopics, //NOTE: no need, should auto bind due to similar name
                 EnableAutoCommit = false,
                 AutoOffsetReset = AutoOffsetReset.Earliest
             };
-            
+
             Configuration.GetSection("Kafka:ConsumerSettings").Bind(ConsumerConfig);
+
+            _defaultConsumerServiceName = ConsumerConfig.GroupId;
             ConsumerConfig.GroupId = $"{ConsumerConfig.GroupId}.{Topic.TopicName}";
 
             //this.topic = config.GetValue<List<string>>("Kafka:ServiceConsumerTopic").First();
@@ -91,6 +97,8 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
             _contextEnabled = _kafkaOptions.Context?.Enabled == true;
             _retries = _kafkaOptions.Retries >= 0 ? _kafkaOptions.Retries : 3;
             _retryInterval = _kafkaOptions.RetryInterval > 0 ? _kafkaOptions.RetryInterval : 2;
+
+            _propagator = Propagators.DefaultTextMapPropagator; 
         }
 
         #region override
@@ -213,160 +221,180 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                 {
                     var cr = this.KafkaConsumer.Consume(cancellationToken);
 
-                    string spanContext = GetMessageSpanContext(cr.Message);
-                    var messageProperties = GetMessageProperties(cr.Message);
+                    var parentContext = _propagator.Extract(default, cr.Message, ExtractTraceContextFromOutboxMessageHeaders);
+                    Baggage.Current = parentContext.Baggage;
 
-                    if (_loggerEnabled)
+                    var activityName = $"{Topic.TopicName} receive";
+                    
+                    //NOTE: make sure that a parent activity is available (parentContext.ActivityContext.TraceId == new ActivityTraceId()) 
+                    using (var activity = parentContext.ActivityContext.TraceId == new ActivityTraceId() ? null : Extensions.ConfluentKafkaActivitySource.StartActivity(activityName, ActivityKind.Consumer, parentContext.ActivityContext))
                     {
-                        Logger.LogInformation($"Received a message with key: '{cr.Message.Key}', id: '{messageProperties.MessageId}', " +
-                                               $"correlation id: '{messageProperties.CorrelationId}', unix timestamp: {messageProperties.Timestamp} " +
-                                               $"from Kafka Topic: {Topic.TopicName}.");
-                    }
+                        //Add Tags to the Activity
+                        // as per convention in opentelemetry specification
+                        activity?.SetTag("service.name", _defaultConsumerServiceName);
+                        activity?.SetTag("messaging.system", "kafka");
+                        activity?.SetTag("messaging.destination_kind", "topic");
+                        activity?.SetTag("messaging.destination", Topic.TopicName);
+                        activity?.SetTag("messaging.kafka.message_key", cr.Message.Key);
+                        activity?.SetTag("messaging.kafka.consumer_group", ConsumerConfig.GroupId);
+                        activity?.SetTag("messaging.kafka.client_id", ConsumerConfig.ClientId);
+                        activity?.SetTag("messaging.kafka.partition", cr.Partition.Value);
+                        
+                        string spanContext = GetMessageSpanContext(cr.Message);
+                        var messageProperties = GetMessageProperties(cr.Message);
 
-                    string messageType = GetMessageType(cr.Message);
-
-                    if (string.IsNullOrWhiteSpace(messageType))
-                    {
-                        Logger.LogError($"The method type header was not found. Message value was found to be corrupt: {cr.Message.Value}.");
-                        //TODO: Need to create a strategy to deal with commit failures
-                        Logger.LogError($"Irrecoverable error encountered. Message value: {cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
-                        break;
-                    }
-
-                    if (!Events.ContainsKey(messageType))
-                    {
                         if (_loggerEnabled)
                         {
-                            Logger.LogWarning($"Consumer warning, the event type is not found in the registered event types. Incoming event type:{messageType}. This event will be ignored.");
+                            Logger.LogInformation($"Received a message with key: '{cr.Message.Key}', id: '{messageProperties.MessageId}', " +
+                                                   $"correlation id: '{messageProperties.CorrelationId}', unix timestamp: {messageProperties.Timestamp} " +
+                                                   $"from Kafka Topic: {Topic.TopicName}.");
                         }
-                        try
+
+                        string messageType = GetMessageType(cr.Message);
+
+                        if (string.IsNullOrWhiteSpace(messageType))
                         {
-                            KafkaConsumer.Commit(cr);
+                            Logger.LogError($"The method type header was not found. Message value was found to be corrupt: {cr.Message.Value}.");
+                            //TODO: Need to create a strategy to deal with commit failures
+                            Logger.LogError($"Irrecoverable error encountered. Message value: {cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                            break;
                         }
-                        catch (KafkaException e)
+
+                        if (!Events.ContainsKey(messageType))
                         {
-                            Logger.LogError($"Commit error: {e.Error.Reason}");
+                            if (_loggerEnabled)
+                            {
+                                Logger.LogWarning($"Consumer warning, the event type is not found in the registered event types. Incoming event type:{messageType}. This event will be ignored.");
+                            }
+                            try
+                            {
+                                KafkaConsumer.Commit(cr);
+                            }
+                            catch (KafkaException e)
+                            {
+                                Logger.LogError($"Commit error: {e.Error.Reason}");
+                                //TODO: Need to create a strategy to deal with commit failures
+                                Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                                break;
+                            }
+                            continue;
+                        }
+
+                        var registeredEventType = Events[messageType];
+                        if (!EventHandlerForEvent.ContainsKey(registeredEventType))
+                        {
+                            Logger.LogError($"The EventHandler For  registered event type:{registeredEventType} is not found in the registered EventHandler types. Corrupted state.");
                             //TODO: Need to create a strategy to deal with commit failures
                             Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
                             break;
                         }
-                        continue;
-                    }
 
-                    var registeredEventType = Events[messageType];
-                    if (!EventHandlerForEvent.ContainsKey(registeredEventType))
-                    {
-                        Logger.LogError($"The EventHandler For  registered event type:{registeredEventType} is not found in the registered EventHandler types. Corrupted state.");
-                        //TODO: Need to create a strategy to deal with commit failures
-                        Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
-                        break;
-                    }
+                        var eventHandlerType = EventHandlerForEvent[registeredEventType];
+                        if (_loggerEnabled)
+                        {
+                            Logger.LogInformation($"Consumer info, the incoming event type is:{messageType}, the registered event type : {registeredEventType.Name} and the registered EventHandler type:{eventHandlerType}. TimeStamp:{DateTimeOffset.UtcNow}");
+                        }
 
-                    var eventHandlerType = EventHandlerForEvent[registeredEventType];
-                    if (_loggerEnabled)
-                    {
-                        Logger.LogInformation($"Consumer info, the incoming event type is:{messageType}, the registered event type : {registeredEventType.Name} and the registered EventHandler type:{eventHandlerType}. TimeStamp:{DateTimeOffset.UtcNow}");
-                    }
-
-                    if (_loggerEnabled)
-                    {
-                        Logger.LogInformation($"Consumer info, the incoming event is about to be deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
-                    }
+                        if (_loggerEnabled)
+                        {
+                            Logger.LogInformation($"Consumer info, the incoming event is about to be deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
+                        }
                         
-                    var deserializeEvent = JsonConvert.DeserializeObject(cr.Message.Value, registeredEventType);
-                    if (_loggerEnabled)
-                    {
-                        Logger.LogInformation($"Consumer info, the incoming event is successfully deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
-                    }
-
-                    using var scope = ServiceProvider.CreateScope();
-
-                    var messagePropertiesAccessor = scope.ServiceProvider.GetRequiredService<IMessagePropertiesAccessor>();
-                    messagePropertiesAccessor.MessageProperties = messageProperties;
-
-
-                    if (_contextEnabled)
-                    {
-                        var correlationContext  = GetMessageCorrelationContext(cr.Message);
-
-                        if (correlationContext is not null)
+                        var deserializeEvent = JsonConvert.DeserializeObject(cr.Message.Value, registeredEventType);
+                        if (_loggerEnabled)
                         {
-                            var correlationContextAccessor = scope.ServiceProvider.GetRequiredService<ICorrelationContextAccessor>();
-                            correlationContextAccessor.CorrelationContext = correlationContext;
-                        }
-                    }
-
-                    object eventHandlerObject;
-                    try
-                    {
-                        eventHandlerObject = scope.ServiceProvider.GetRequiredService(eventHandlerType);
-                    }
-                    catch (InvalidOperationException e)
-                    {
-                        //NOTE: Following is considered an error as the event is found registered but problem is in resolving eventHandler. This could be due to error in code.
-                        Logger.LogError($"The method HandleAsync for EventHandler Type:{eventHandlerType} is not found. Error:{e}");
-                        //TODO: Need to create a strategy to deal with commit failures
-                        Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
-                        break;
-                    }
-                    catch (Exception e)
-                    {
-                        //NOTE: Following is considered an error as the event is found registered but problem is in resolving eventHandler. This could be due to error in code.
-                        Logger.LogError($"The method HandleAsync for EventHandler Type:{eventHandlerType} is not found. Error:{e}");
-                        //TODO: Need to create a strategy to deal with commit failures
-                        Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
-                        break;
-                    }
-
-                    var parameterTypes = new Type[] { registeredEventType };
-                    var eventHandlerMethodInfo = eventHandlerType.GetMethod("HandleAsync", parameterTypes);
-
-                    if (eventHandlerMethodInfo is null)
-                    {
-                        Logger.LogError($"The Class Method HandleAsync for EventHandler Type:{eventHandlerType} is not found. Check the Type Implementation for the missing method");
-                        //TODO: Need to create a strategy to deal with commit failures
-                        Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
-                        break;
-                    }
-                    
-                    try
-                    {
-                        var messageName = deserializeEvent.GetType().Name;
-
-                        Logger.LogInformation($"Handling a message: '{messageName}' [id: '{messageProperties.MessageId}'] with correlation id: '{messageProperties.CorrelationId}'. TimeStamp:{DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
-
-                        object[] parameters = new object[] { deserializeEvent };
-                        var handleAsyncTask = (Task)eventHandlerMethodInfo.Invoke(eventHandlerObject, parameters);
-
-                        if (handleAsyncTask is null)
-                        {
-                            Logger.LogError($"Unable to handle a message: '{messageName}' [id: '{messageProperties.MessageId}'] with correlation id: '{messageProperties.CorrelationId}'. The expected Task object was not returned from HandleAsync MethodInfo object");
-                            Logger.LogError($"Irrecoverable error encountered. Message value:{cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
-                            break;
+                            Logger.LogInformation($"Consumer info, the incoming event is successfully deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
                         }
 
-                        handleAsyncTask.Wait(cancellationToken);
+                        using var scope = ServiceProvider.CreateScope();
 
-                        Logger.LogInformation($"Handled a message: '{messageName}' [id: '{messageProperties.MessageId}'] with correlation id: '{messageProperties.CorrelationId}'. TimeStamp:{DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
+                        var messagePropertiesAccessor = scope.ServiceProvider.GetRequiredService<IMessagePropertiesAccessor>();
+                        messagePropertiesAccessor.MessageProperties = messageProperties;
+
+
+                        if (_contextEnabled)
+                        {
+                            var correlationContext  = GetMessageCorrelationContext(cr.Message);
+
+                            if (correlationContext is not null)
+                            {
+                                var correlationContextAccessor = scope.ServiceProvider.GetRequiredService<ICorrelationContextAccessor>();
+                                correlationContextAccessor.CorrelationContext = correlationContext;
+                            }
+                        }
+
+                        object eventHandlerObject;
                         try
                         {
-                            KafkaConsumer.Commit(cr);
+                            eventHandlerObject = scope.ServiceProvider.GetRequiredService(eventHandlerType);
                         }
-                        catch (KafkaException e)
+                        catch (InvalidOperationException e)
                         {
-                            Logger.LogError($"Commit error: {e.Error.Reason}");
+                            //NOTE: Following is considered an error as the event is found registered but problem is in resolving eventHandler. This could be due to error in code.
+                            Logger.LogError($"The method HandleAsync for EventHandler Type:{eventHandlerType} is not found. Error:{e}");
                             //TODO: Need to create a strategy to deal with commit failures
-                            Logger.LogError($"Irrecoverable error encountered. Message value:{cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                            Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                            break;
+                        }
+                        catch (Exception e)
+                        {
+                            //NOTE: Following is considered an error as the event is found registered but problem is in resolving eventHandler. This could be due to error in code.
+                            Logger.LogError($"The method HandleAsync for EventHandler Type:{eventHandlerType} is not found. Error:{e}");
+                            //TODO: Need to create a strategy to deal with commit failures
+                            Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                            break;
+                        }
+
+                        var parameterTypes = new Type[] { registeredEventType };
+                        var eventHandlerMethodInfo = eventHandlerType.GetMethod("HandleAsync", parameterTypes);
+
+                        if (eventHandlerMethodInfo is null)
+                        {
+                            Logger.LogError($"The Class Method HandleAsync for EventHandler Type:{eventHandlerType} is not found. Check the Type Implementation for the missing method");
+                            //TODO: Need to create a strategy to deal with commit failures
+                            Logger.LogError($"Irrecoverable error encountered. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
                             break;
                         }
                         
+                        try
+                        {
+                            var messageName = deserializeEvent.GetType().Name;
 
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.LogError(e.ToString());
-                        Logger.LogError($"Irrecoverable error encountered. Message value:{cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
-                        break;
+                            Logger.LogInformation($"Handling a message: '{messageName}' [id: '{messageProperties.MessageId}'] with correlation id: '{messageProperties.CorrelationId}'. TimeStamp:{DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
+
+                            object[] parameters = new object[] { deserializeEvent };
+                            var handleAsyncTask = (Task)eventHandlerMethodInfo.Invoke(eventHandlerObject, parameters);
+
+                            if (handleAsyncTask is null)
+                            {
+                                Logger.LogError($"Unable to handle a message: '{messageName}' [id: '{messageProperties.MessageId}'] with correlation id: '{messageProperties.CorrelationId}'. The expected Task object was not returned from HandleAsync MethodInfo object");
+                                Logger.LogError($"Irrecoverable error encountered. Message value:{cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                                break;
+                            }
+
+                            handleAsyncTask.Wait(cancellationToken);
+
+                            Logger.LogInformation($"Handled a message: '{messageName}' [id: '{messageProperties.MessageId}'] with correlation id: '{messageProperties.CorrelationId}'. TimeStamp:{DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
+                            try
+                            {
+                                KafkaConsumer.Commit(cr);
+                            }
+                            catch (KafkaException e)
+                            {
+                                Logger.LogError($"Commit error: {e.Error.Reason}");
+                                //TODO: Need to create a strategy to deal with commit failures
+                                Logger.LogError($"Irrecoverable error encountered. Message value:{cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                                break;
+                            }
+                            
+
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.LogError(e.ToString());
+                            Logger.LogError($"Irrecoverable error encountered. Message value:{cr.Message.Value}. Decision Taken to stop Confluent consumer for topic: {Topic.TopicName}, ConsumerGroupId: {ConsumerConfig.GroupId}. Admin should fix error and restart service.");
+                            break;
+                        }
                     }
                 }
                 catch (OperationCanceledException e)
@@ -538,12 +566,46 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     messageProperties.CorrelationId = Encoding.UTF8.GetString(messageHeader.GetValueBytes());
                 }
 
-                messageProperties.Headers.Add(messageHeader.Key, messageHeader.GetValueBytes());
+                //TODO: currently only support string type objects
+                //NOTE: Kafka allows duplicate headers
+                if (!messageProperties.Headers.ContainsKey(messageHeader.Key))
+                {
+                    messageProperties.Headers.Add(messageHeader.Key, Encoding.UTF8.GetString(messageHeader.GetValueBytes()));
+                }
+                else
+                {
+                    messageProperties.Headers[messageHeader.Key] = Encoding.UTF8.GetString(messageHeader.GetValueBytes());
+                }
             }
 
             //TODO: id messageProperties.MessageId and messageProperties.CorrelationId required field?
             
             return messageProperties;
+        }
+
+        private IEnumerable<string> ExtractTraceContextFromOutboxMessageHeaders(Message<string, string> props, string key)
+        {
+            try
+            {
+                props.Headers ??= new Headers();
+                if (props.Headers.TryGetLastBytes(key, out var value))
+                {
+                    if (value is {Length: > 0} valueBytes)
+                    {
+                        var valueStr = Encoding.UTF8.GetString(valueBytes);
+                        return new[] { valueStr };
+                    }
+
+                    throw new FormatException($"Type:{value.GetType()} of value:{value} not found to be of Type:{nameof(String)}.");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to extract trace context: {ex}");
+            }
+
+            return Enumerable.Empty<string>();
         }
     }
 }

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Reflection;
 using Convey.MessageBrokers.Outbox.Messages;
 using Convey.MessageBrokers.Outbox.Mongo.Internals;
 using Convey.Persistence.MongoDB;
@@ -8,6 +10,8 @@ namespace Convey.MessageBrokers.Outbox.Mongo
 {
     public static class Extensions
     {
+        public static readonly ActivitySource MongoMessageOutboxActivitySource = new(Assembly.GetAssembly(typeof(Convey.MessageBrokers.Outbox.Mongo.Extensions)).GetName().Name);
+        
         public static IMessageOutboxConfigurator AddMongo(this IMessageOutboxConfigurator configurator)
         {
             var builder = configurator.Builder;

@@ -35,6 +35,8 @@
 	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
     <PackageReference Include="Polly" Version="7.2.1" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.6573.7" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.6573.7" />
   </ItemGroup>
 
   <ItemGroup>
