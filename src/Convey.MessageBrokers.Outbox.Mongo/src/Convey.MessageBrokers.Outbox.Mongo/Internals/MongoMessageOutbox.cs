@@ -120,12 +120,16 @@ namespace Convey.MessageBrokers.Outbox.Mongo.Internals
             if (Activity.Current != null)
             {
                 parentContextToInject = Activity.Current.Context;
+
+                _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
             }
             else
             {
-                var parentContext = _propagator.Extract(default, headers, ExtractTraceContextFromOutboxMessageHeaders);
+                var parentContext = _propagator.Extract(default, headers, ExtractTraceContextFromHeaders);
                 parentContextToInject = parentContext.ActivityContext;
                 Baggage.Current = parentContext.Baggage;
+
+                _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
             }
 
             var mongodbCollectionName = _outboxRepository.Collection.CollectionNamespace.FullName;
@@ -155,7 +159,7 @@ namespace Convey.MessageBrokers.Outbox.Mongo.Internals
 
                 headers.Add(Convey.MessageBrokers.Outbox.Extensions.Destination, mongodbCollectionName);
                 headers.Add(Convey.MessageBrokers.Outbox.Extensions.EventName, message.GetType().Name);
-                AddActivityContextToOutboxMessageHeader(contextToInject, headers);
+                AddActivityContextToHeader(contextToInject, headers);
                 
                 if (!Enabled)
                 {
@@ -212,7 +216,7 @@ namespace Convey.MessageBrokers.Outbox.Mongo.Internals
                 Builders<OutboxMessage>.Filter.In(m => m.Id, outboxMessages.Select(m => m.Id)),
                 Builders<OutboxMessage>.Update.Set(m => m.ProcessedAt, DateTime.UtcNow));
 
-        private void AddActivityContextToOutboxMessageHeader(ActivityContext activityContext, IDictionary<string, object> header)
+        private void AddActivityContextToHeader(ActivityContext activityContext, IDictionary<string, object> header)
         {
             _propagator.Inject(new PropagationContext(activityContext, Baggage.Current), header, InjectContextIntoOutboxMessageHeader);
         }
@@ -222,7 +226,14 @@ namespace Convey.MessageBrokers.Outbox.Mongo.Internals
             try
             {
                 headers ??= new Dictionary<string, object>();
-                headers.Add(key, value);
+                if (!headers.ContainsKey(key))
+                {
+                    headers.Add(key, value);
+                }
+                else
+                {
+                    headers[key] = value;
+                }
             }
             catch (Exception ex)
             {
@@ -230,7 +241,7 @@ namespace Convey.MessageBrokers.Outbox.Mongo.Internals
             }
         }
         
-        private IEnumerable<string> ExtractTraceContextFromOutboxMessageHeaders(IDictionary<string, object> headers, string key)
+        private IEnumerable<string> ExtractTraceContextFromHeaders(IDictionary<string, object> headers, string key)
         {
             try
             {
@@ -250,6 +261,12 @@ namespace Convey.MessageBrokers.Outbox.Mongo.Internals
                 _logger.LogError($"Failed to extract trace context: {ex}");
             }
 
+            return Enumerable.Empty<string>();
+        }
+
+        private IEnumerable<string> RemoveTraceContextFromHeaders(IDictionary<string, object> headers, string key)
+        {
+            if (headers.ContainsKey(key)) headers.Remove(key);
             return Enumerable.Empty<string>();
         }
     }

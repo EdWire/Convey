@@ -57,12 +57,16 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             if (Activity.Current != null)
             {
                 parentContextToInject = Activity.Current.Context;
+                
+                _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
             }
             else
             {
-                var parentContext = _propagator.Extract(default, headers, ExtractTraceContextFromOutboxMessageHeaders);
+                var parentContext = _propagator.Extract(default, headers, ExtractTraceContextFromHeaders);
                 Baggage.Current = parentContext.Baggage;
                 parentContextToInject = parentContext.ActivityContext;
+
+                _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
             }
             var publishTopic = _kafkaOptions.ServicePublishTopic;
             var activityName = $"{publishTopic} send";
@@ -117,6 +121,30 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                 var correlationIdBody = Encoding.UTF8.GetBytes(confluentCorrelationId);
                 confluentMessage.Headers.Add(_correlationIdHeader, correlationIdBody);
 
+                if (!string.IsNullOrWhiteSpace(spanContext))
+                {
+                    var spanContextBody = Encoding.UTF8.GetBytes(spanContext);
+                    confluentMessage.Headers.Add(_spanContextHeader, spanContextBody);
+                }
+
+                if (headers is { })
+                {
+                    foreach (var (key, value) in headers)
+                    {
+                        if (string.IsNullOrWhiteSpace(key) || value is null)
+                        {
+                            continue;
+                        }
+                        var valueBody = Encoding.UTF8.GetBytes((string)value); //TODO: currently only support string type objects
+                        confluentMessage.Headers.Add(key, valueBody);
+                    }
+                }
+
+                if (_contextEnabled)
+                {
+                    IncludeMessageContext(messageContext, confluentMessage);
+                }
+
                 // Depending on Sampling (and whether a listener is registered or not), the activity above may not be created.
                 // If it is created, then propagate its context.
                 // If it is not created, then propagate the Current context, if any.
@@ -136,30 +164,6 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                     contextToInject = Activity.Current.Context;
                 }
                 AddActivityToKafkaMessageHeader(contextToInject, confluentMessage);
-
-                if (_contextEnabled)
-                {
-                    IncludeMessageContext(messageContext, confluentMessage);
-                }
-                
-                if (!string.IsNullOrWhiteSpace(spanContext))
-                {
-                    var spanContextBody = Encoding.UTF8.GetBytes(spanContext);
-                    confluentMessage.Headers.Add(_spanContextHeader, spanContextBody);
-                }
-
-                if (headers is {})
-                {
-                    foreach (var (key, value) in headers)
-                    {
-                        if (string.IsNullOrWhiteSpace(key) || value is null)
-                        {
-                            continue;
-                        }
-                        var valueBody = Encoding.UTF8.GetBytes((string)value); //TODO: currently only support string type objects
-                        confluentMessage.Headers.Add(key, valueBody);
-                    }
-                }
 
                 if (_loggerEnabled)
                 {
@@ -251,7 +255,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
             }
         }
 
-        private IEnumerable<string> ExtractTraceContextFromOutboxMessageHeaders(IDictionary<string, object> headers, string key)
+        private IEnumerable<string> ExtractTraceContextFromHeaders(IDictionary<string, object> headers, string key)
         {
             try
             {
@@ -271,6 +275,12 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                 _logger.LogError($"Failed to extract trace context: {ex}");
             }
 
+            return Enumerable.Empty<string>();
+        }
+
+        private IEnumerable<string> RemoveTraceContextFromHeaders(IDictionary<string, object> headers, string key)
+        {
+            if (headers.ContainsKey(key)) headers.Remove(key);
             return Enumerable.Empty<string>();
         }
     }
