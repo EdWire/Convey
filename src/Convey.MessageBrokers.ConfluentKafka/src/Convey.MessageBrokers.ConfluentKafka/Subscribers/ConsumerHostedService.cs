@@ -225,11 +225,11 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     Baggage.Current = parentContext.Baggage;
 
 
-                    if (_loggerEnabled)
-                    {
-                        Logger.LogInformation($"Parent activity TraceId : {parentContext.ActivityContext.TraceId}");
-                        Logger.LogInformation($"Parent activity SpanId : {parentContext.ActivityContext.SpanId}");
-                    }
+                    //if (_loggerEnabled)
+                    //{
+                    //    Logger.LogInformation($"Parent activity TraceId : {parentContext.ActivityContext.TraceId}");
+                    //    Logger.LogInformation($"Parent activity SpanId : {parentContext.ActivityContext.SpanId}");
+                    //}
 
                     var activityName = $"{Topic.TopicName} receive";
                     
@@ -241,9 +241,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                         {
                             if (activity is not null)
                             {
-                                Logger.LogInformation($"Kafka activity created: {activity}");
-                                Logger.LogInformation($"Kafka activity TraceId: {activity.TraceId}");
-                                Logger.LogInformation($"Kafka activity SpanId: {activity.SpanId}");
+                                Logger.LogInformation($"Kafka activity created TraceId: {activity.TraceId},  SpanId: {activity.SpanId}");
                             }
                             else
                             {

@@ -2,14 +2,16 @@
 
   <PropertyGroup>
     <Description>Convey.MessageBrokers.Outbox</Description>
-    <Authors>DevMentors.io</Authors>
+    <Authors>EdGraph</Authors>
     <TargetFramework>net5.0</TargetFramework>
     <LangVersion>Latest</LangVersion>
     <AssemblyName>Convey.MessageBrokers.Outbox</AssemblyName>
     <Title>Convey.MessageBrokers.Outbox</Title>
     <PackageId>Convey.MessageBrokers.Outbox</PackageId>
     <PackageTags>Convey.MessageBrokers.Outbox</PackageTags>
-    <LangVersion>latest</LangVersion>
+	<Version>0.5.5004</Version>
+	<Company>EdGraph</Company>
+	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <!--<ItemGroup>

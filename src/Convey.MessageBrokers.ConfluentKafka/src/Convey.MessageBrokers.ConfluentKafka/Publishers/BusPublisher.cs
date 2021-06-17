@@ -53,7 +53,6 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
         public Task PublishAsync<T>(T message, string messageId = null, string correlationId = null, string spanContext = null, object messageContext = null, IDictionary<string, object> headers = null)
         where T : class
         {
-            _logger.LogInformation($"Starting Activity.");
             ActivityContext parentContextToInject = default;
             if (Activity.Current != null)
             {
@@ -61,12 +60,12 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                 
                 _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
 
-                if (_loggerEnabled)
-                {
-                    _logger.LogInformation($"Activity.Current found : {Activity.Current}");
-                    _logger.LogInformation($"Activity.Current TraceId : {Activity.Current.TraceId}");
-                    _logger.LogInformation($"Activity.Current SpanId : {Activity.Current.SpanId}");
-                }
+                //if (_loggerEnabled)
+                //{
+                //    _logger.LogInformation($"Activity.Current found : {Activity.Current}");
+                //    _logger.LogInformation($"Activity.Current TraceId : {Activity.Current.TraceId}");
+                //    _logger.LogInformation($"Activity.Current SpanId : {Activity.Current.SpanId}");
+                //}
             }
             else
             {
@@ -76,12 +75,12 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
 
                 _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
 
-                if (_loggerEnabled)
-                {
-                    _logger.LogInformation($"Activity.Current not found.");
-                    _logger.LogInformation($"Header extracted parentContext.ActivityContext TraceId : {parentContext.ActivityContext.TraceId}");
-                    _logger.LogInformation($"Header extracted parentContext.ActivityContext SpanId : {parentContext.ActivityContext.SpanId}");
-                }
+                //if (_loggerEnabled)
+                //{
+                //    _logger.LogInformation($"Activity.Current not found.");
+                //    _logger.LogInformation($"Header extracted parentContext.ActivityContext TraceId : {parentContext.ActivityContext.TraceId}");
+                //    _logger.LogInformation($"Header extracted parentContext.ActivityContext SpanId : {parentContext.ActivityContext.SpanId}");
+                //}
             }
             var publishTopic = _kafkaOptions.ServicePublishTopic;
             var activityName = $"{publishTopic} send";
@@ -100,9 +99,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                 {
                     if (activity is not null)
                     {
-                        _logger.LogInformation($"Kafka activity created: {activity}");
-                        _logger.LogInformation($"Kafka activity TraceId: {activity.TraceId}");
-                        _logger.LogInformation($"Kafka activity SpanId: {activity.SpanId}");
+                        _logger.LogInformation($"Kafka activity created TraceId: {activity.TraceId},  SpanId: {activity.SpanId}");
                     }
                     else
                     {
