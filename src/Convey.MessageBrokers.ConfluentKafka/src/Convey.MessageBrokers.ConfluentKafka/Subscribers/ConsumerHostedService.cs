@@ -224,11 +224,34 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                     var parentContext = _propagator.Extract(default, cr.Message, ExtractTraceContextFromOutboxMessageHeaders);
                     Baggage.Current = parentContext.Baggage;
 
+
+                    if (_loggerEnabled)
+                    {
+                        Logger.LogInformation($"Parent activity TraceId : {parentContext.ActivityContext.TraceId}");
+                        Logger.LogInformation($"Parent activity SpanId : {parentContext.ActivityContext.SpanId}");
+                    }
+
                     var activityName = $"{Topic.TopicName} receive";
                     
                     //NOTE: make sure that a parent activity is available (parentContext.ActivityContext.TraceId == new ActivityTraceId()) 
                     using (var activity = parentContext.ActivityContext.TraceId == new ActivityTraceId() ? null : Extensions.ConfluentKafkaActivitySource.StartActivity(activityName, ActivityKind.Consumer, parentContext.ActivityContext))
                     {
+
+                        if (_loggerEnabled)
+                        {
+                            if (activity is not null)
+                            {
+                                Logger.LogInformation($"Kafka activity created: {activity}");
+                                Logger.LogInformation($"Kafka activity TraceId: {activity.TraceId}");
+                                Logger.LogInformation($"Kafka activity SpanId: {activity.SpanId}");
+                            }
+                            else
+                            {
+                                Logger.LogInformation($"Kafka activity not created.");
+                            }
+                        }
+
+
                         //Add Tags to the Activity
                         // as per convention in opentelemetry specification
                         activity?.SetTag("service.name", _defaultConsumerServiceName);
