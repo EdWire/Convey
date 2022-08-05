@@ -9,14 +9,14 @@
     <Title>Convey.MessageBrokers.Outbox.Mongo</Title>
     <PackageId>Convey.MessageBrokers.Outbox.Mongo</PackageId>
     <PackageTags>Convey.MessageBrokers.Outbox.Mongo</PackageTags>
-	<Version>1.0.550</Version>
+	<Version>1.0.551</Version>
 	<Company>EdGraph</Company>
 	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Convey.Persistence.MongoDB" Version="1.0.541" />
-		<PackageReference Include="Convey.MessageBrokers.Outbox" Version="1.0.550" />
+		<PackageReference Include="Convey.MessageBrokers.Outbox" Version="1.0.551" />
 		<PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.7955.14" />
 		<PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.7955.14" />
 	</ItemGroup>

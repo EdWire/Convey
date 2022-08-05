@@ -27,16 +27,17 @@ Supported features that will help to quickly set up your next microservices:
 Created & maintained by [devmentors.io](http://devmentors.io).
 
 
-#In project folder (for )
-nuget pack -Prop Configuration=Release
 
+#Step1:First way (preferered)
+-Build project(s) with release
+-Go to "bin" folder and copy the nuget to the project folder
 
-#Push Nuget package (login with ewconsoltent.net required)
-nuget push Convey.MessageBrokers.Outbox.1.0.550.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+#Step2: Push Nuget package (login with ewconsoltent.net required, change nuget file name)
+nuget push Convey.MessageBrokers.Outbox.1.0.551.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
-nuget push Convey.MessageBrokers.Outbox.Mongo.1.0.550.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+nuget push Convey.MessageBrokers.Outbox.Mongo.1.0.551.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
-nuget push Convey.MessageBrokers.ConfluentKafka.1.0.550.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+nuget push Convey.MessageBrokers.ConfluentKafka.1.0.551.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
 #Tests
 
@@ -49,3 +50,10 @@ nuget push Convey.MessageBrokers.Outbox.1.0.550.nupkg -src https://edwire.pkgs.v
 -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
 nuget push <PACKAGE_PATH> -src https://pkgs.dev.azure.com/<ORGANIZATION_NAME>/<PROJECT_NAME>/_packaging/<FEED_NAME>/nuget/v3/index.json -ApiKey <ANY_STRING>
+
+
+#Step1:Second Way
+#In project folder (for each project)
+nuget pack -Prop Configuration=Release
+or
+dotnet pack -p:GeneratePackageOnBuild=false 
