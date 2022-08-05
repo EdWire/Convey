@@ -1,10 +1,8 @@
 using System;
 
-namespace Convey.MessageBrokers.RabbitMQ.Plugins
+namespace Convey.MessageBrokers.RabbitMQ.Plugins;
+
+internal sealed class RabbitMqPluginChain
 {
-    internal sealed class RabbitMqPluginChain
-    {
-        public Type PluginType { get; set; }
-        public IRabbitMqPlugin Plugin { get; set; }
-    }
+    public Type PluginType { get; set; }
 }

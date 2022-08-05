@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Description>Convey.MessageBrokers</Description>
     <Authors>DevMentors.io</Authors>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <LangVersion>Latest</LangVersion>
     <AssemblyName>Convey.MessageBrokers</AssemblyName>
     <Title>Convey.MessageBrokers</Title>
@@ -13,10 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Convey\src\Convey\Convey.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
   </ItemGroup>
 
 </Project>

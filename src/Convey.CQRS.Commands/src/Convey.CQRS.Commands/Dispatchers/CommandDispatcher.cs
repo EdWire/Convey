@@ -1,22 +1,23 @@
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Convey.CQRS.Commands.Dispatchers
+namespace Convey.CQRS.Commands.Dispatchers;
+
+internal sealed class CommandDispatcher : ICommandDispatcher
 {
-    internal sealed class CommandDispatcher : ICommandDispatcher
+    private readonly IServiceProvider _serviceProvider;
+
+    public CommandDispatcher(IServiceProvider serviceProvider)
     {
-        private readonly IServiceScopeFactory _serviceFactory;
+        _serviceProvider = serviceProvider;
+    }
 
-        public CommandDispatcher(IServiceScopeFactory serviceFactory)
-        {
-            _serviceFactory = serviceFactory;
-        }
-
-        public async Task SendAsync<T>(T command) where T : class, ICommand
-        {
-            using var scope = _serviceFactory.CreateScope();
-            var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<T>>();
-            await handler.HandleAsync(command);
-        }
+    public async Task SendAsync<T>(T command, CancellationToken cancellationToken = default) where T : class, ICommand
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<T>>();
+        await handler.HandleAsync(command, cancellationToken);
     }
 }

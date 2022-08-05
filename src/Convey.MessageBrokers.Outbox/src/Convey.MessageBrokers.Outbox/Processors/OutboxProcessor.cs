@@ -10,86 +10,86 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
 
-namespace Convey.MessageBrokers.Outbox.Processors
+namespace Convey.MessageBrokers.Outbox.Processors;
+
+internal sealed class OutboxProcessor : IHostedService
 {
-    internal sealed class OutboxProcessor : IHostedService
-    {
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IBusPublisher _publisher;
-        private readonly OutboxOptions _options;
-        private readonly ILogger<OutboxProcessor> _logger;
-        private readonly TimeSpan _interval;
-        private readonly OutboxType _type;
-        private Timer _timer;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IBusPublisher _publisher;
+    private readonly OutboxOptions _options;
+    private readonly ILogger<OutboxProcessor> _logger;
+    private readonly TimeSpan _interval;
+    private readonly OutboxType _type;
+    private Timer _timer;
         static readonly SemaphoreSlim SemaphoreSlim = new(1, 1);
 
         private readonly TextMapPropagator _propagator;
 
-        public OutboxProcessor(IServiceScopeFactory serviceScopeFactory, IBusPublisher publisher, OutboxOptions options,
-            ILogger<OutboxProcessor> logger)
+    public OutboxProcessor(IServiceProvider serviceProvider, IBusPublisher publisher, OutboxOptions options,
+        ILogger<OutboxProcessor> logger)
+    {
+        if (options.Enabled && options.IntervalMilliseconds <= 0)
         {
-            if (options.Enabled && options.IntervalMilliseconds <= 0)
-            {
-                throw new Exception($"Invalid outbox interval: {options.IntervalMilliseconds} ms.");
-            }
-            
-            if (!string.IsNullOrWhiteSpace(options.Type))
-            {
-                if (!Enum.TryParse<OutboxType>(options.Type, true, out var outboxType))
-                {
-                    throw new ArgumentException($"Invalid outbox type: '{_type}', " +
-                                                $"valid types: '{OutboxType.Sequential}', '{OutboxType.Parallel}'.");
-                }
-
-                _type = outboxType;
-            }
-
-            _serviceScopeFactory = serviceScopeFactory;
-            _publisher = publisher;
-            _options = options;
-            _logger = logger;
-            _type = OutboxType.Sequential;
-            _interval = TimeSpan.FromMilliseconds(options.IntervalMilliseconds);
-            _propagator = Propagators.DefaultTextMapPropagator;
-            if (options.Enabled)
-            {
-                _logger.LogInformation($"Outbox is enabled, type: '{_type}', message processing every {options.IntervalMilliseconds} ms.");
-                return;
-            }
-
-            _logger.LogInformation("Outbox is disabled.");
+            throw new Exception($"Invalid outbox interval: {options.IntervalMilliseconds} ms.");
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        _type = OutboxType.Sequential;
+        if (!string.IsNullOrWhiteSpace(options.Type))
         {
-            if (!_options.Enabled)
+            if (!Enum.TryParse<OutboxType>(options.Type, true, out var outboxType))
             {
-                return Task.CompletedTask;
+                throw new ArgumentException($"Invalid outbox type: '{_type}', " +
+                                            $"valid types: '{OutboxType.Sequential}', '{OutboxType.Parallel}'.");
             }
+
+            _type = outboxType;
+        }
+
+        _serviceProvider = serviceProvider;
+        _publisher = publisher;
+        _options = options;
+        _logger = logger;            
+        _interval = TimeSpan.FromMilliseconds(options.IntervalMilliseconds);
+            _propagator = Propagators.DefaultTextMapPropagator;
+        if (options.Enabled)
+        {
+            _logger.LogInformation($"Outbox is enabled, type: '{_type}', message processing every {options.IntervalMilliseconds} ms.");
+            return;
+        }
+
+        _logger.LogInformation("Outbox is disabled.");
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        if (!_options.Enabled)
+        {
+            return Task.CompletedTask;
+        }
 
             _timer = new Timer(SendOutboxMessages, null, _interval, _interval);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        if (!_options.Enabled)
+        {
             return Task.CompletedTask;
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            if (!_options.Enabled)
-            {
-                return Task.CompletedTask;
-            }
-
-            _timer?.Change(Timeout.Infinite, 0);
+        _timer?.Change(Timeout.Infinite, 0);
             _timer?.Dispose();
-            return Task.CompletedTask;
-        }
+        return Task.CompletedTask;
+    }
 
-        private void SendOutboxMessages(object state)
-        {
-            _ = SendOutboxMessagesAsync();
-        }
+    private void SendOutboxMessages(object state)
+    {
+        _ = SendOutboxMessagesAsync();
+    }
 
-        private async Task SendOutboxMessagesAsync()
-        {
+    private async Task SendOutboxMessagesAsync()
+    {
             string jobId = Guid.NewGuid().ToString("N");
 
             _logger.LogTrace($"SendOutboxMessagesAsync start time for outbox messages... [job id: '{jobId}', interval: {_interval}], start time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
@@ -103,25 +103,25 @@ namespace Convey.MessageBrokers.Outbox.Processors
                 _logger.LogTrace($"Stopping timer for outbox messages... [job id: '{jobId}']");
                 _timer?.Change(Timeout.Infinite, Timeout.Infinite);
                 
-                _logger.LogTrace($"Started processing outbox messages... [job id: '{jobId}']");
-                var stopwatch = new Stopwatch();
-                stopwatch.Start();
-                using var scope = _serviceScopeFactory.CreateScope();
-                var outbox = scope.ServiceProvider.GetRequiredService<IMessageOutboxAccessor>();
+            _logger.LogTrace($"Started processing outbox messages... [job id: '{jobId}']");
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+        using var scope = _serviceProvider.CreateScope();
+            var outbox = scope.ServiceProvider.GetRequiredService<IMessageOutboxAccessor>();
 
                 _logger.LogTrace($"Start time for unsent messages of outbox messages... [job id: '{jobId}', interval: {_interval}], start time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
-                var messages = await outbox.GetUnsentAsync();
+            var messages = await outbox.GetUnsentAsync();
                 _logger.LogTrace($"End time for unsent messages of outbox messages... [job id: '{jobId}', interval: {_interval}], end time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
 
-                _logger.LogTrace($"Found {messages.Count} unsent messages in outbox [job id: '{jobId}'].");
-                if (!messages.Any())
-                {
-                    _logger.LogTrace($"No messages to be processed in outbox [job id: '{jobId}'].");
-                    return;
-                }
+        _logger.LogTrace($"Found {messages.Count} unsent messages in outbox [job ID: '{jobId}'].");
+            if (!messages.Any())
+            {
+            _logger.LogTrace($"No messages to be processed in outbox [job ID: '{jobId}'].");
+                return;
+            }
 
-                foreach (var message in messages.OrderBy(m => m.SentAt))
-                {
+            foreach (var message in messages.OrderBy(m => m.SentAt))
+            {
                     message.Headers ??= new Dictionary<string, object>();
 
                     var destinationName = "Unknown";
@@ -154,20 +154,20 @@ namespace Convey.MessageBrokers.Outbox.Processors
 
                         await _publisher.PublishAsync(message.Message, message.Id, message.CorrelationId, message.SpanContext, message.MessageContext, message.Headers);
                         
-                        if (_type == OutboxType.Sequential)
-                        {
-                            await outbox.ProcessAsync(message);
-                        }
-                    }
-                }
-
-                if (_type == OutboxType.Parallel)
+                if (_type == OutboxType.Sequential)
                 {
-                    await outbox.ProcessAsync(messages);
+                    await outbox.ProcessAsync(message);
+                }
+            }
                 }
 
-                stopwatch.Stop();
-                _logger.LogTrace($"Processed {messages.Count} outbox messages in {stopwatch.ElapsedMilliseconds} ms [job id: '{jobId}'].");
+            if (_type == OutboxType.Parallel)
+            {
+                await outbox.ProcessAsync(messages);
+            }
+
+            stopwatch.Stop();
+        _logger.LogTrace($"Processed {messages.Count} outbox messages in {stopwatch.ElapsedMilliseconds} ms [job ID: '{jobId}'].");
             }
             finally
             {
@@ -190,13 +190,12 @@ namespace Convey.MessageBrokers.Outbox.Processors
 
                 _logger.LogTrace($"SendOutboxMessagesAsync end time for outbox messages... [job id: '{jobId}', interval: {_interval}], end time: {DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
             }
-        }
+    }
 
-        private enum OutboxType
-        {
-            Sequential,
-            Parallel
-        }
+    private enum OutboxType
+    {
+        Sequential,
+        Parallel
 
         private IEnumerable<string> ExtractTraceContextFromOutboxMessageHeaders(IDictionary<string, object> headers, string key)
         {
