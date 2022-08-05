@@ -25,3 +25,27 @@ Supported features that will help to quickly set up your next microservices:
 - Web API extensions (minimal routing-based API, CQRS support)
 
 Created & maintained by [devmentors.io](http://devmentors.io).
+
+
+#In project folder (for )
+nuget pack -Prop Configuration=Release
+
+
+#Push Nuget package (login with ewconsoltent.net required)
+nuget push Convey.MessageBrokers.Outbox.1.0.550.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+
+nuget push Convey.MessageBrokers.Outbox.Mongo.1.0.550.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+
+nuget push Convey.MessageBrokers.ConfluentKafka.1.0.550.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+
+#Tests
+
+nuget spec
+
+nuget pack Convey.MessageBrokers.Outbox.Mongo.nuspec -properties Configuration=Release -IncludeReferencedProjects
+
+nuget push Convey.MessageBrokers.Outbox.1.0.550.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -n edgraph -u "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+
+-ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+
+nuget push <PACKAGE_PATH> -src https://pkgs.dev.azure.com/<ORGANIZATION_NAME>/<PROJECT_NAME>/_packaging/<FEED_NAME>/nuget/v3/index.json -ApiKey <ANY_STRING>

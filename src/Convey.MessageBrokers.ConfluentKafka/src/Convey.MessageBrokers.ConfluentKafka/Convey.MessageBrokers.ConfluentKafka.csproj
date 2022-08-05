@@ -3,13 +3,13 @@
   <PropertyGroup>
     <Description>Convey.MessageBrokers.ConfluentKafka</Description>
     <Authors>EdGraph</Authors>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <LangVersion>Latest</LangVersion>
     <AssemblyName>Convey.MessageBrokers.ConfluentKafka</AssemblyName>
     <Title>Convey.MessageBrokers.ConfluentKafka</Title>
     <PackageId>Convey.MessageBrokers.ConfluentKafka</PackageId>
     <PackageTags>Convey.MessageBrokers.ConfluentKafka</PackageTags>
-	<Version>0.5.5013</Version>
+	<Version>1.0.550</Version>
 	<Company>EdGraph</Company>
 	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
@@ -22,21 +22,21 @@
     <ProjectReference Include="..\..\..\Convey.MessageBrokers\src\Convey.MessageBrokers\Convey.MessageBrokers.csproj" />
   </ItemGroup>-->
 	<ItemGroup>
-		<PackageReference Include="Convey" Version="0.5.433" />
-		<PackageReference Include="Convey.CQRS.Commands" Version="0.5.433" />
-		<PackageReference Include="Convey.CQRS.Events" Version="0.5.433" />
-		<PackageReference Include="Convey.CQRS.Queries" Version="0.5.433" />
-		<PackageReference Include="Convey.MessageBrokers" Version="0.5.433" />
+		<PackageReference Include="Convey" Version="1.0.541" />
+		<PackageReference Include="Convey.CQRS.Commands" Version="1.0.541" />
+		<PackageReference Include="Convey.CQRS.Events" Version="1.0.541" />
+		<PackageReference Include="Convey.CQRS.Queries" Version="1.0.541" />
+		<PackageReference Include="Convey.MessageBrokers" Version="1.0.541" />
 	</ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="Confluent.Kafka" Version="1.6.2" />
-    <PackageReference Include="Confluent.SchemaRegistry.Serdes.Json" Version="1.6.2" />
-	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
+    <PackageReference Include="Confluent.Kafka" Version="1.9.2" />
+    <PackageReference Include="Confluent.SchemaRegistry.Serdes.Json" Version="1.9.2" />
+	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
     <PackageReference Include="Polly" Version="7.2.1" />
-    <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.6573.7" />
-    <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.6573.7" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.7955.14" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.7955.14" />
   </ItemGroup>
 
   <ItemGroup>
