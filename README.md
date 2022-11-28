@@ -33,9 +33,9 @@ Created & maintained by [devmentors.io](http://devmentors.io).
 -Go to "bin" folder and copy the nuget to the project folder
 
 #Step2: Push Nuget package (login with ewconsoltent.net required, change nuget file name)
-nuget push Convey.MessageBrokers.Outbox.1.0.551.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+nuget push Convey.MessageBrokers.Outbox.1.0.552.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
-nuget push Convey.MessageBrokers.Outbox.Mongo.1.0.551.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+nuget push Convey.MessageBrokers.Outbox.Mongo.1.0.552.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
 nuget push Convey.MessageBrokers.ConfluentKafka.1.0.551.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
