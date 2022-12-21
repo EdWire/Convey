@@ -9,7 +9,7 @@
     <Title>Convey.MessageBrokers.ConfluentKafka</Title>
     <PackageId>Convey.MessageBrokers.ConfluentKafka</PackageId>
     <PackageTags>Convey.MessageBrokers.ConfluentKafka</PackageTags>
-	<Version>1.0.552</Version>
+	<Version>1.0.553</Version>
 	<Company>EdGraph</Company>
 	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
@@ -35,8 +35,8 @@
 	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
     <PackageReference Include="Polly" Version="7.2.1" />
-    <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.8321.24" />
-    <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.8321.24" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.8380.4" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.8380.4" />
   </ItemGroup>
 
   <ItemGroup>
