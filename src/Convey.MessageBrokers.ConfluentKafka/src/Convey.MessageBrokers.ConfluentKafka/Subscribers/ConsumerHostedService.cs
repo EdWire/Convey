@@ -366,7 +366,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                             break;
                         }
 
-                        var parameterTypes = new Type[] { registeredEventType };
+                        var parameterTypes = new Type[] { registeredEventType, typeof(CancellationToken) };
                         var eventHandlerMethodInfo = eventHandlerType.GetMethod("HandleAsync", parameterTypes);
 
                         if (eventHandlerMethodInfo is null)
@@ -383,7 +383,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
 
                             Logger.LogInformation($"Handling a message: '{messageName}' [id: '{messageProperties.MessageId}'] with correlation id: '{messageProperties.CorrelationId}'. TimeStamp:{DateTimeOffset.UtcNow.ToString("MM/dd/yyyy HH:mm:ss.fff")}");
 
-                            object[] parameters = new object[] { deserializeEvent };
+                            object[] parameters = new object[] { deserializeEvent, null };
                             var handleAsyncTask = (Task)eventHandlerMethodInfo.Invoke(eventHandlerObject, parameters);
 
                             if (handleAsyncTask is null)
