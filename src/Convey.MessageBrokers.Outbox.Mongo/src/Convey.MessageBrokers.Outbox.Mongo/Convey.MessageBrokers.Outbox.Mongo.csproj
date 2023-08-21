@@ -1,20 +1,29 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Description>Convey.MessageBrokers.Outbox.Mongo</Description>
-    <Authors>DevMentors.io</Authors>
+    <Authors>EdGraph</Authors>
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>Latest</LangVersion>
     <AssemblyName>Convey.MessageBrokers.Outbox.Mongo</AssemblyName>
     <Title>Convey.MessageBrokers.Outbox.Mongo</Title>
     <PackageId>Convey.MessageBrokers.Outbox.Mongo</PackageId>
     <PackageTags>Convey.MessageBrokers.Outbox.Mongo</PackageTags>
-    <LangVersion>latest</LangVersion>
+	<Version>1.1.450</Version>
+	<Company>EdGraph</Company>
+	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
+    <ItemGroup>
+        <!--<ProjectReference Include="..\..\..\Convey.MessageBrokers.Outbox\src\Convey.MessageBrokers.Outbox\Convey.MessageBrokers.Outbox.csproj" />-->
+        <!--<ProjectReference Include="..\..\..\Convey.Persistence.MongoDB\src\Convey.Persistence.MongoDB\Convey.Persistence.MongoDB.csproj" />-->
+    </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Convey.MessageBrokers.Outbox\src\Convey.MessageBrokers.Outbox\Convey.MessageBrokers.Outbox.csproj" />
-    <ProjectReference Include="..\..\..\Convey.Persistence.MongoDB\src\Convey.Persistence.MongoDB\Convey.Persistence.MongoDB.csproj" />
+    <PackageReference Include="Convey.Persistence.MongoDB" Version="1.1.448" />
+    <PackageReference Include="Convey.MessageBrokers.Outbox" Version="1.1.450" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.8380.4" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.8380.4" />
   </ItemGroup>
+
 
 </Project>

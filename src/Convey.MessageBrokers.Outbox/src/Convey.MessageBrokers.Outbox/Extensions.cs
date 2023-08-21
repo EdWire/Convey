@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Reflection;
 using Convey.MessageBrokers.Outbox.Configurators;
 using Convey.MessageBrokers.Outbox.Outbox;
 using Convey.MessageBrokers.Outbox.Processors;
@@ -10,6 +12,11 @@ public static class Extensions
 {
     private const string SectionName = "outbox";
     private const string RegistryName = "messageBrokers.outbox";
+
+        public static readonly string Destination = "destination";
+        public static readonly string EventName = "eventname";
+        
+        public static readonly ActivitySource MessageOutboxActivitySource = new(Assembly.GetAssembly(typeof(Convey.MessageBrokers.Outbox.Extensions)).GetName().Name);
 
     public static IConveyBuilder AddMessageOutbox(this IConveyBuilder builder,
         Action<IMessageOutboxConfigurator> configure = null, string sectionName = SectionName)

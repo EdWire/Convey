@@ -25,3 +25,19 @@ Supported features that will help to quickly set up your next microservices:
 - Web API extensions (minimal routing-based API, CQRS support)
 
 Created & maintained by [devmentors.io](http://devmentors.io).
+
+#Step1:
+-Build project(s) with release
+-Go to "bin" folder and copy the nuget to the "project folder"
+
+#Step2 Auth:
+- Go to  https://dev.azure.com/edwire/EW.Educate/_artifacts/feed/edgraph/connect
+- download nuget.exe and place it side by side with "bin" and project file in the "project folder" (IMPORTNANT!!!)
+
+
+#Step3: Push Nuget package (login with ewconsoltent.net required, change nuget file name)
+.\nuget.exe push Convey.MessageBrokers.Outbox.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+
+.\nuget.exe push Convey.MessageBrokers.Outbox.Mongo.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+
+.\nuget.exe push Convey.MessageBrokers.ConfluentKafka.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,6 +9,8 @@ using Convey.MessageBrokers.Outbox.Messages;
 using Convey.Persistence.MongoDB;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 
 namespace Convey.MessageBrokers.Outbox.Mongo.Internals;
 
@@ -30,6 +33,9 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
 
     public bool Enabled { get; }
 
+        
+        private readonly TextMapPropagator _propagator;
+
     public MongoMessageOutbox(IMongoSessionFactory sessionFactory,
         IMongoRepository<InboxMessage, string> inboxRepository,
         IMongoRepository<OutboxMessage, string> outboxRepository,
@@ -41,6 +47,8 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
         _logger = logger;
         _transactionsEnabled = !options.DisableTransactions;
         Enabled = options.Enabled;
+
+            _propagator = Propagators.DefaultTextMapPropagator;
     }
 
     public async Task HandleAsync(string messageId, Func<Task> handler)
@@ -103,35 +111,81 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
         }
     }
 
-    public async Task SendAsync<T>(T message, string originatedMessageId = null, string messageId = null,
-        string correlationId = null, string spanContext = null, object messageContext = null,
-        IDictionary<string, object> headers = null) where T : class
-    {
-        if (!Enabled)
+        public async Task SendAsync<T>(T message, string originatedMessageId = null, string messageId = null, string correlationId = null, string spanContext = null, object messageContext = null, IDictionary<string, object> headers = null)
+        where T : class
         {
-            _logger.LogWarning("Outbox is disabled, outgoing messages won't be saved into the storage.");
-            return;
-        }
+            ActivityContext parentContextToInject = default;
+            if (Activity.Current != null)
+        {
+                parentContextToInject = Activity.Current.Context;
 
-        var outboxMessage = new OutboxMessage
-        {
-            Id = string.IsNullOrWhiteSpace(messageId) ? Guid.NewGuid().ToString("N") : messageId,
-            OriginatedMessageId = originatedMessageId,
-            CorrelationId = correlationId,
-            SpanContext = spanContext,
-            SerializedMessageContext =
-                messageContext is null
-                    ? EmptyJsonObject
-                    : JsonSerializer.Serialize(messageContext, SerializerOptions),
-            MessageContextType = messageContext?.GetType().AssemblyQualifiedName,
-            Headers = (Dictionary<string, object>) headers,
-            SerializedMessage = message is null
-                ? EmptyJsonObject
-                : JsonSerializer.Serialize(message, SerializerOptions),
-            MessageType = message?.GetType().AssemblyQualifiedName,
-            SentAt = DateTime.UtcNow
-        };
-        await _outboxRepository.AddAsync(outboxMessage);
+                _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
+            }
+            else
+            {
+                var parentContext = _propagator.Extract(default, headers, ExtractTraceContextFromHeaders);
+                parentContextToInject = parentContext.ActivityContext;
+                Baggage.Current = parentContext.Baggage;
+
+                _propagator.Extract(default, headers, RemoveTraceContextFromHeaders);
+            }
+
+            var mongodbCollectionName = _outboxRepository.Collection.CollectionNamespace.FullName;
+
+            var activityName = $"{mongodbCollectionName} send";
+            
+            //NOTE: make sure that a parent activity is available (parentContext.ActivityContext.TraceId == new ActivityTraceId()) 
+            using (var activity = parentContextToInject.TraceId == new ActivityTraceId() ? null : Extensions.MongoMessageOutboxActivitySource.StartActivity(activityName, ActivityKind.Producer, parentContextToInject))
+            {
+
+                // Depending on Sampling (and whether a listener is registered or not), the activity above may not be created.
+                // If it is created, then propagate its context.
+                // If it is not created, then propagate the Current context, if any.
+                ActivityContext contextToInject = default;
+                if (activity != null)
+                {
+                    activity?.SetTag("messaging.system", "outbox");
+                    activity?.SetTag("messaging.destination", mongodbCollectionName);
+                    activity?.SetTag("messaging.event", message.GetType().Name);
+                    contextToInject = activity.Context;
+                }
+                else if (Activity.Current != null)
+                {
+                    contextToInject = Activity.Current.Context;
+                }
+                headers ??= new Dictionary<string, object>();
+
+                headers.Add(Convey.MessageBrokers.Outbox.Extensions.Destination, mongodbCollectionName);
+                headers.Add(Convey.MessageBrokers.Outbox.Extensions.EventName, message.GetType().Name);
+                AddActivityContextToHeader(contextToInject, headers);
+                
+            if (!Enabled)
+            {
+                _logger.LogWarning("Outbox is disabled, outgoing messages won't be saved into the storage.");
+                return;
+            }
+
+            var outboxMessage = new OutboxMessage
+            {
+                Id = string.IsNullOrWhiteSpace(messageId) ? Guid.NewGuid().ToString("N") : messageId,
+                OriginatedMessageId = originatedMessageId,
+                CorrelationId = correlationId,
+                SpanContext = spanContext,
+				SerializedMessageContext =
+                	messageContext is null
+                    	? EmptyJsonObject
+                    	: JsonSerializer.Serialize(messageContext, SerializerOptions),
+                MessageContextType = messageContext?.GetType().AssemblyQualifiedName,
+                Headers = (Dictionary<string, object>) headers,
+				SerializedMessage =
+					message is null
+                		? EmptyJsonObject
+                		: JsonSerializer.Serialize(message, SerializerOptions),
+                MessageType = message?.GetType().AssemblyQualifiedName,
+                SentAt = DateTime.UtcNow
+            };
+            await _outboxRepository.AddAsync(outboxMessage);
+            }
     }
 
     async Task<IReadOnlyList<OutboxMessage>> IMessageOutboxAccessor.GetUnsentAsync()
@@ -165,4 +219,58 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
         => _outboxRepository.Collection.UpdateManyAsync(
             Builders<OutboxMessage>.Filter.In(m => m.Id, outboxMessages.Select(m => m.Id)),
             Builders<OutboxMessage>.Update.Set(m => m.ProcessedAt, DateTime.UtcNow));
+
+        private void AddActivityContextToHeader(ActivityContext activityContext, IDictionary<string, object> header)
+        {
+            _propagator.Inject(new PropagationContext(activityContext, Baggage.Current), header, InjectContextIntoOutboxMessageHeader);
+        }
+
+        private void InjectContextIntoOutboxMessageHeader(IDictionary<string, object> headers, string key, string value)
+        {
+            try
+            {
+                headers ??= new Dictionary<string, object>();
+                if (!headers.ContainsKey(key))
+                {
+                    headers.Add(key, value);
+                }
+                else
+                {
+                    headers[key] = value;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to inject trace context.");
+            }
+        }
+        
+        private IEnumerable<string> ExtractTraceContextFromHeaders(IDictionary<string, object> headers, string key)
+        {
+            try
+            {
+                if (headers.TryGetValue(key, out var value))
+                {
+                    if (value is string valueStr)
+                    {
+                        return new[] { valueStr };
+                    }
+
+                    throw new FormatException($"Type:{value.GetType()} of value:{value} not found to be of Type:{nameof(String)}.");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to extract trace context: {ex}");
+            }
+
+            return Enumerable.Empty<string>();
+        }
+
+        private IEnumerable<string> RemoveTraceContextFromHeaders(IDictionary<string, object> headers, string key)
+        {
+            if (headers.ContainsKey(key)) headers.Remove(key);
+            return Enumerable.Empty<string>();
+        }
 }

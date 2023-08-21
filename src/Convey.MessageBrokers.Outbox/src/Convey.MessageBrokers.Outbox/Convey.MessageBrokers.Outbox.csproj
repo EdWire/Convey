@@ -2,23 +2,29 @@
 
   <PropertyGroup>
     <Description>Convey.MessageBrokers.Outbox</Description>
-    <Authors>DevMentors.io</Authors>
+    <Authors>EdGraph</Authors>
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>Latest</LangVersion>
     <AssemblyName>Convey.MessageBrokers.Outbox</AssemblyName>
     <Title>Convey.MessageBrokers.Outbox</Title>
     <PackageId>Convey.MessageBrokers.Outbox</PackageId>
     <PackageTags>Convey.MessageBrokers.Outbox</PackageTags>
-    <LangVersion>latest</LangVersion>
+    <Version>1.1.450</Version>
+    <Company>EdGraph</Company>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!--<ItemGroup>
     <ProjectReference Include="..\..\..\Convey\src\Convey\Convey.csproj" />
     <ProjectReference Include="..\..\..\Convey.MessageBrokers\src\Convey.MessageBrokers\Convey.MessageBrokers.csproj" />
-  </ItemGroup>
+  </ItemGroup>-->
 
   <ItemGroup>
+    <PackageReference Include="Convey" Version="1.1.448" />
+    <PackageReference Include="Convey.MessageBrokers" Version="1.1.448" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.0" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Logging" Version="0.9.8380.4" />
+    <PackageReference Include="EdGraph.Common.OpenTelemetry.Tracing" Version="0.9.8380.4" />
   </ItemGroup>
   
 </Project>
