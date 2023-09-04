@@ -14,7 +14,7 @@ using OpenTelemetry.Context.Propagation;
 
 namespace Convey.MessageBrokers.ConfluentKafka.Publishers
 {
-    internal sealed class BusPublisher : IBusPublisher
+    public sealed class BusPublisher : IBusPublisher
     {
         private readonly KafkaOptions _kafkaOptions; 
         private readonly KafkaDependentProducer<string, string> _kafkaDependentProducer;
