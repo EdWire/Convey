@@ -9,7 +9,7 @@
     <Title>Convey.MessageBrokers.ConfluentKafka</Title>
     <PackageId>Convey.MessageBrokers.ConfluentKafka</PackageId>
     <PackageTags>Convey.MessageBrokers.ConfluentKafka</PackageTags>
-	<Version>1.1.450</Version>
+	<Version>1.2.0</Version>
 	<Company>EdGraph</Company>
 	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
