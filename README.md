@@ -40,4 +40,4 @@ Created & maintained by [devmentors.io](http://devmentors.io).
 
 .\nuget.exe push Convey.MessageBrokers.Outbox.Mongo.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
 
-.\nuget.exe push Convey.MessageBrokers.ConfluentKafka.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+.\nuget.exe push Convey.MessageBrokers.ConfluentKafka.1.2.1.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
