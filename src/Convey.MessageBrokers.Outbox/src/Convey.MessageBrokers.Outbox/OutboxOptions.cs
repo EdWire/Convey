@@ -9,4 +9,5 @@ public class OutboxOptions
     public string OutboxCollection { get; set; }
     public string Type { get; set; } 
     public bool DisableTransactions { get; set; }
+    public int? MaxResults { get; set; }
 }

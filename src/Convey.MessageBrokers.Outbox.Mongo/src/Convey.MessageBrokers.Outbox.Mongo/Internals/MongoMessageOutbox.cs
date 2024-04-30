@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Convey.CQRS.Queries;
 using Convey.MessageBrokers.Outbox.Messages;
 using Convey.Persistence.MongoDB;
 using Microsoft.Extensions.Logging;
@@ -36,6 +37,8 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
         
         private readonly TextMapPropagator _propagator;
 
+    private int MaxResults { get; }
+
     public MongoMessageOutbox(IMongoSessionFactory sessionFactory,
         IMongoRepository<InboxMessage, string> inboxRepository,
         IMongoRepository<OutboxMessage, string> outboxRepository,
@@ -49,6 +52,8 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
         Enabled = options.Enabled;
 
             _propagator = Propagators.DefaultTextMapPropagator;
+
+        MaxResults = options.MaxResults ?? 100;
     }
 
     public async Task HandleAsync(string messageId, Func<Task> handler)
@@ -190,7 +195,9 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
 
     async Task<IReadOnlyList<OutboxMessage>> IMessageOutboxAccessor.GetUnsentAsync()
     {
-        var outboxMessages = await _outboxRepository.FindAsync(om => om.ProcessedAt == null);
+        var pagedResult = await _outboxRepository.BrowseAsync(om => om.ProcessedAt == null, new OutboxMessageQuery(MaxResults));
+        var outboxMessages = pagedResult.Items.ToList();
+
         return outboxMessages.Select(om =>
         {
             if (om.MessageContextType is not null)
@@ -273,4 +280,12 @@ internal sealed class MongoMessageOutbox : IMessageOutbox, IMessageOutboxAccesso
             if (headers.ContainsKey(key)) headers.Remove(key);
             return Enumerable.Empty<string>();
         }
+
+    private class OutboxMessageQuery : PagedQueryBase
+    {
+        public OutboxMessageQuery(int results)
+        {
+            Results = results;
+        }
+    }
 }

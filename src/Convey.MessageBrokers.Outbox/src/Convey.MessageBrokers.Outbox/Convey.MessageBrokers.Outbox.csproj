@@ -9,7 +9,7 @@
     <Title>Convey.MessageBrokers.Outbox</Title>
     <PackageId>Convey.MessageBrokers.Outbox</PackageId>
     <PackageTags>Convey.MessageBrokers.Outbox</PackageTags>
-    <Version>1.1.450</Version>
+    <Version>1.2.0</Version>
     <Company>EdGraph</Company>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
