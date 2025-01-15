@@ -29,8 +29,15 @@ internal class MongoRepository<TEntity, TIdentifiable> : IMongoRepository<TEntit
 		=> await Collection.Find(predicate).ToListAsync();
 
 	public Task<PagedResult<TEntity>> BrowseAsync<TQuery>(Expression<Func<TEntity, bool>> predicate,
-		TQuery query) where TQuery : IPagedQuery
-		=> Collection.AsQueryable().Where(predicate).PaginateAsync(query);
+		TQuery query,
+        AggregateOptions options = null) where TQuery : IPagedQuery
+	{
+		var aggregateOptions = options ?? new AggregateOptions { 
+			Collation = new Collation("en") 
+		};
+
+        return Collection.AsQueryable(aggregateOptions).Where(predicate).PaginateAsync(query);
+    }
 
 	public Task AddAsync(TEntity entity)
 		=> Collection.InsertOneAsync(entity);

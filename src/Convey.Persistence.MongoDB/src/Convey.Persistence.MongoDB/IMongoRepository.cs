@@ -16,7 +16,8 @@ public interface IMongoRepository<TEntity, in TIdentifiable> where TEntity : IId
 	Task<IReadOnlyList<TEntity>> FindAsync(Expression<Func<TEntity, bool>> predicate);
 
 	Task<PagedResult<TEntity>> BrowseAsync<TQuery>(Expression<Func<TEntity, bool>> predicate,
-		TQuery query) where TQuery : IPagedQuery;
+		TQuery query,
+        AggregateOptions options = null) where TQuery : IPagedQuery;
 
 	Task AddAsync(TEntity entity);
 	Task UpdateAsync(TEntity entity);

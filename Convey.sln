@@ -211,6 +211,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{3E26B53F-820
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Convey.MessageBrokers.ConfluentKafka", "src\Convey.MessageBrokers.ConfluentKafka\src\Convey.MessageBrokers.ConfluentKafka\Convey.MessageBrokers.ConfluentKafka.csproj", "{61FAA824-6B39-44AB-9440-B9FE17844331}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Convey.Persistence.MongoDB.Tests", "Convey.Persistence.MongoDB.Tests\Convey.Persistence.MongoDB.Tests.csproj", "{9391F724-DE69-4B44-B52E-0A55A84B3DCE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -653,6 +655,18 @@ Global
 		{61FAA824-6B39-44AB-9440-B9FE17844331}.Release|x64.Build.0 = Release|Any CPU
 		{61FAA824-6B39-44AB-9440-B9FE17844331}.Release|x86.ActiveCfg = Release|Any CPU
 		{61FAA824-6B39-44AB-9440-B9FE17844331}.Release|x86.Build.0 = Release|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Debug|x64.Build.0 = Debug|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Debug|x86.Build.0 = Debug|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|x64.ActiveCfg = Release|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|x64.Build.0 = Release|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|x86.ActiveCfg = Release|Any CPU
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -760,6 +774,7 @@ Global
 		{10CA9296-FF45-4BEE-8B67-61223D5F52F7} = {C6B61C07-E175-48F3-A689-5BF7E741AA9F}
 		{3E26B53F-8201-4371-A15B-FC947026302C} = {10CA9296-FF45-4BEE-8B67-61223D5F52F7}
 		{61FAA824-6B39-44AB-9440-B9FE17844331} = {3E26B53F-8201-4371-A15B-FC947026302C}
+		{9391F724-DE69-4B44-B52E-0A55A84B3DCE} = {1FC73434-F71A-4BE5-BB8D-EAC036D36A10}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A3CCF644-0A79-4D5E-87D8-D90975CA57EF}
