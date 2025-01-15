@@ -9,6 +9,7 @@
     <Title>Convey.Persistence.MongoDB</Title>
     <PackageId>Convey.Persistence.MongoDB</PackageId>
     <PackageTags>Convey.Persistence.MongoDB</PackageTags>
+	<Version>1.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
