@@ -26,18 +26,57 @@ Supported features that will help to quickly set up your next microservices:
 
 Created & maintained by [devmentors.io](http://devmentors.io).
 
-#Step1:
--Build project(s) with release
--Go to "bin" folder and copy the nuget to the "project folder"
+## How to update a package?
 
-#Step2 Auth:
-- Go to  https://dev.azure.com/edwire/EW.Educate/_artifacts/feed/edgraph/connect
-- download nuget.exe and place it side by side with "bin" and project file in the "project folder" (IMPORTNANT!!!)
+### Terminology
 
+- **Project folder**: The directory where the .csproj file of your library is located.
+- **NuGet Package file:** A file with the extension .nupkg
 
-#Step3: Push Nuget package (login with ewconsoltent.net required, change nuget file name)
-.\nuget.exe push Convey.MessageBrokers.Outbox.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+### Steps
 
-.\nuget.exe push Convey.MessageBrokers.Outbox.Mongo.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+1. Update the version of the package accordingly, i.e. in the .csproj file of your project add the `Version` tag:
 
-.\nuget.exe push Convey.MessageBrokers.ConfluentKafka.1.1.450.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+```xml
+<PropertyGroup>    
+    ...    
+    <Version>1.0.0</Version>    
+    ...
+</PropertyGroup>
+```
+
+2. Generate the nuget package file by running this command in your project folder:
+
+```sh
+dotnet pack {PackageName}.csproj -c Release
+```
+
+e.g.
+
+```sh
+dotnet pack Convey.Persistence.MongoDB.csproj -c Release
+```
+
+3. Copy the generated nuget package file from {ProjectFolder}/bin/Release to the project folder, e.g:
+```
+// Copy from here
+{ProjectFolder}/bin/Release/{PackageName}.nupkg
+
+// To here
+{ProjectFolder}/{PackageName}.nupkg
+```
+
+4. Get the nuget.exe tool.    
+    1. Go to https://dev.azure.com/edwire/EW.Educate/_artifacts/feed/edgraph/connect.    
+    2. Select the "NuGet.exe" option from the list.    
+    3. Click on the "Get the tools" button and then on the "Download the latest NuGet" link.    
+    4. A nuget.exe file will be downloaded into your Downloads folder.    
+    5. Copy the nuget.exe into the project folder.
+
+5. Publish the nuget package by running the following command in the project folder:
+
+```sh
+.\nuget.exe push {PackageName}.nupkg -src https://edwire.pkgs.visualstudio.com/EW.Educate/_packaging/edgraph/nuget/v3/index.json -ApiKey "Azure DevOps Artifacts - EdGraph Feed (Read-Only)"
+```
+
+6. Verify that the package was pushed with the correct version by going to https://dev.azure.com/edwire/EW.Educate/_artifacts/feed/edgraph and searching your package name.
