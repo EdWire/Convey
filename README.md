@@ -80,3 +80,7 @@ dotnet pack Convey.Persistence.MongoDB.csproj -c Release
 ```
 
 6. Verify that the package was pushed with the correct version by going to https://dev.azure.com/edwire/EW.Educate/_artifacts/feed/edgraph and searching your package name.
+
+7. After updating a given package to a different version, make sure to upgrade all packages for convey that use the recently upgraded package following steps 1 to 6
+
+8. Make sure to upgrade all packages in the services that use them.
