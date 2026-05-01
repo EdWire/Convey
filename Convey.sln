@@ -213,6 +213,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Convey.MessageBrokers.Confl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Convey.Persistence.MongoDB.Tests", "Convey.Persistence.MongoDB.Tests\Convey.Persistence.MongoDB.Tests.csproj", "{9391F724-DE69-4B44-B52E-0A55A84B3DCE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Convey.MessageBrokers.ConfluentKafka.Tests", "Convey.MessageBrokers.ConfluentKafka.Tests\Convey.MessageBrokers.ConfluentKafka.Tests.csproj", "{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -667,6 +669,18 @@ Global
 		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|x64.Build.0 = Release|Any CPU
 		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|x86.ActiveCfg = Release|Any CPU
 		{9391F724-DE69-4B44-B52E-0A55A84B3DCE}.Release|x86.Build.0 = Release|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Debug|x64.Build.0 = Debug|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Debug|x86.Build.0 = Debug|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Release|x64.ActiveCfg = Release|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Release|x64.Build.0 = Release|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Release|x86.ActiveCfg = Release|Any CPU
+		{E6C24EE7-5EE3-4AC0-A7B6-D89C2A4256D1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
+using Convey.MessageBrokers.ConfluentKafka.Converters;
 using Convey.MessageBrokers.ConfluentKafka.Exceptions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -16,6 +17,10 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
 {
     public sealed class BusPublisher : IBusPublisher
     {
+        private static readonly JsonSerializerSettings SerializerSettings = new()
+        {
+            Converters = { new SystemTextJsonNodeConverter() }
+        };
         private readonly KafkaOptions _kafkaOptions; 
         private readonly KafkaDependentProducer<string, string> _kafkaDependentProducer;
         private readonly ILogger<BusPublisher> _logger;
@@ -133,7 +138,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Publishers
                     ? confluentMessageId 
                     : aggregateId;
 
-                var messageValue = JsonConvert.SerializeObject(message);
+                var messageValue = JsonConvert.SerializeObject(message, SerializerSettings);
 
                 var confluentMessage = new Message<string, string>
                 {
