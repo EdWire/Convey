@@ -43,8 +43,13 @@ public class BusPublisher_JsonSerialization_Tests
         => STJ.JsonSerializer.Deserialize<TestMessage>(json,
                new STJ.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
 
+    private static readonly JsonSerializerSettings FixedSettings = new()
+    {
+        Converters = { new SystemTextJsonNodeConverter() }
+    };
+
     [Fact]
-    public void Step1_Baseline_bare_SerializeObject_throws_circular_reference()
+    public void Step1_CustomConverter_serializes_string_values_correctly()
     {
         var message = BuildMessageAsDeserializedByOutbox("""
             {
@@ -53,54 +58,52 @@ public class BusPublisher_JsonSerialization_Tests
             }
             """);
 
-        // Reproduces the original crash — this throws JsonSerializationException.
-        JsonConvert.SerializeObject(message);
+        var result = JsonConvert.SerializeObject(message, FixedSettings);
+
+        result.ShouldBe("""{"Name":"Test Job","Input":{"stageType":"sequence","stages":[]}}""");
     }
 
     [Fact]
-    public void Step2_ReferenceLoopHandling_Ignore_does_not_crash_but_corrupts_values()
+    public void Step2_CustomConverter_preserves_nested_objects_and_arrays()
     {
         var message = BuildMessageAsDeserializedByOutbox("""
             {
-              "name": "Test Job",
-              "input": { "stageType": "sequence", "stages": [] }
+              "name": "Complex Job",
+              "input": {
+                "stageType": "sequence",
+                "stages": [
+                  { "stageType": "task", "taskId": "abc" },
+                  { "stageType": "task", "taskId": "def" }
+                ]
+              }
             }
             """);
 
-        var settings = new JsonSerializerSettings
-        {
-            ReferenceLoopHandling = ReferenceLoopHandling.Ignore
-        };
-
-        // No crash, but let's see what comes out.
-        var result = JsonConvert.SerializeObject(message, settings);
-        Console.WriteLine("ReferenceLoopHandling.Ignore output: " + result);
+        var result = JsonConvert.SerializeObject(message, FixedSettings);
+        Console.WriteLine("Nested output: " + result);
 
         var reparsed = STJ.JsonSerializer.Deserialize<JsonObject>(result)!;
-
-        // This fails — "stageType" is corrupted to {"Options":{...}} instead of "sequence"
         reparsed["Input"]!["stageType"]!.GetValue<string>().ShouldBe("sequence");
+        reparsed["Input"]!["stages"]!.AsArray()[0]!["taskId"]!.GetValue<string>().ShouldBe("abc");
+        reparsed["Input"]!["stages"]!.AsArray()[1]!["taskId"]!.GetValue<string>().ShouldBe("def");
     }
 
     [Fact]
-    public void Step3_SystemTextJsonNodeConverter_produces_correct_json()
+    public void Step3_CustomConverter_roundtrips_input_as_equivalent_json()
     {
-        var message = BuildMessageAsDeserializedByOutbox("""
+        const string inputJson = """{"stageType":"sequence","stages":[]}""";
+
+        var message = BuildMessageAsDeserializedByOutbox($$"""
             {
               "name": "Test Job",
-              "input": { "stageType": "sequence", "stages": [] }
+              "input": {{inputJson}}
             }
             """);
 
-        var settings = new JsonSerializerSettings
-        {
-            Converters = { new SystemTextJsonNodeConverter() }
-        };
-
-        var result = JsonConvert.SerializeObject(message, settings);
-        Console.WriteLine("Custom converter output: " + result);
+        var result = JsonConvert.SerializeObject(message, FixedSettings);
+        Console.WriteLine("Roundtrip output: " + result);
 
         var reparsed = STJ.JsonSerializer.Deserialize<JsonObject>(result)!;
-        reparsed["Input"]!["stageType"]!.GetValue<string>().ShouldBe("sequence");
+        reparsed["Input"]!.ToJsonString().ShouldBe(inputJson);
     }
 }
