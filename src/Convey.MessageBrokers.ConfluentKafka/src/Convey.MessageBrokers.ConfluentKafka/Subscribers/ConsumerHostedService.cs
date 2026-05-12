@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Confluent.Kafka;
+using Convey.MessageBrokers.ConfluentKafka.Converters;
 using Convey.MessageBrokers.ConfluentKafka.Topics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,11 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
         private bool StartCalled { get; set; }
 
         private string EventConsumerHostedServiceId { get; set; }
+
+        private static readonly JsonSerializerSettings DeserializerSettings = new()
+        {
+            Converters = { new SystemTextJsonNodeConverter() }
+        };
 
         private readonly TextMapPropagator _propagator;
         private readonly string _defaultConsumerServiceName;
@@ -321,7 +327,7 @@ namespace Convey.MessageBrokers.ConfluentKafka.Subscribers
                             Logger.LogInformation($"Consumer info, the incoming event is about to be deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
                         }
                         
-                        var deserializeEvent = JsonConvert.DeserializeObject(cr.Message.Value, registeredEventType);
+                        var deserializeEvent = JsonConvert.DeserializeObject(cr.Message.Value, registeredEventType, DeserializerSettings);
                         if (_loggerEnabled)
                         {
                             Logger.LogInformation($"Consumer info, the incoming event is successfully deserialized using registered event type. TimeStamp:{DateTimeOffset.UtcNow}");
